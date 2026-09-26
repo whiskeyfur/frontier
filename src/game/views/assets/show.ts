@@ -15,6 +15,7 @@ import { Ranks } from '../../Ranks';
 import { Schedules } from '../../Schedules';
 import { Wallets } from '../../Wallets';
 import gameLayout from '../layouts/game';
+import subnav from '../subnav';
 import anthroLink from './anthro-link';
 import debtForm from './forms/debt';
 import lifeForm from './forms/life';
@@ -104,6 +105,7 @@ export default function show(v: ViewContext, data: ShowData): Html {
     });
 
     const content = html`
+    ${subnav(v, { section: '/game/assets' })}
     ${isYou ? html`
         <p><a href="/game/home">&larr; Game home</a></p>` : isOwner || Anthros.isEmployer(user, anthro) ? html`
         <p><a href="/game/assets">&larr; Assets</a></p>` : html`

@@ -9,6 +9,7 @@ import { Clock } from '../../Clock';
 import { Land } from '../../Land';
 import { Schedules, type PlanOptions } from '../../Schedules';
 import gameLayout from '../layouts/game';
+import subnav from '../subnav';
 import planFields from './plan-fields';
 import planScript from './plan-script';
 import planText from './plan-text';
@@ -56,6 +57,7 @@ export default function schedule(v: ViewContext, {
     return gameLayout(v, {
         title: anthro.name + "'s schedule - Game",
         content: html`
+    ${subnav(v, { section: '/game/assets' })}
     <p><a href="/game/assets/${anthro.id}">&larr; ${anthro.name}</a></p>
     <h1 class="h3 mb-1">${anthro.name}'s schedule</h1>
     <p class="text-body-secondary">

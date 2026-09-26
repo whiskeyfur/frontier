@@ -28,16 +28,16 @@ describe('Finances', () => {
         const alice = player('alice');
         const me = playerAnthro(alice, { name: 'Alice' });
         setCoins(me.id, 10);
-        const weaver = Number(scalar("SELECT id FROM game_occupations WHERE title = 'Weaver'"));
-        learn(me.id, 'Weaving');
-        Schedules.setWeekly(alice, me, everyDay('work', 'o:' + weaver));
+        const servant = Number(scalar("SELECT id FROM game_occupations WHERE title = 'Servant'"));
+        learn(me.id, 'Service');
+        Schedules.setWeekly(alice, me, everyDay('work', 'o:' + servant));
         const serf = anthro({ owner: alice, name: 'Serf' });
         Schedules.setWeekly(alice, serf, everyDay('work', 'f'));
 
         const report = Finances.report(refresh(me));
         const lines = byLabel(report.lines);
-        expect(lines['Alice (you)'].coins).toBe(7 * 8); // A Journeyman weaver, 8 coins a day.
-        expect(lines['Alice (you)'].detail).toBe('Weaver 7 days');
+        expect(lines['Alice (you)'].coins).toBe(7 * 8); // A Journeyman servant, 8 coins a day.
+        expect(lines['Alice (you)'].detail).toBe('Servant 7 days');
         expect(lines['Serf'].goods).toEqual({ food: 14 }); // Foraging, 2 food a day on average.
         expect(lines['Food for your household'].goods).toEqual({ food: -14 }); // Two mouths, fed from the store and the foraging.
         expect(lines).not.toHaveProperty(['Meals bought at the market']);
@@ -53,9 +53,9 @@ describe('Finances', () => {
         const [, error] = Fiefs.offerGrant(alice, db().lastInsertId(), '', vassal.id, 50);
         expect(error).toBeNull();
         Fiefs.answer(bob, Fiefs.offers(vassal.id).received[0].id, true);
-        learn(vassal.id, 'Weaving');
-        const weaver = Number(scalar("SELECT id FROM game_occupations WHERE title = 'Weaver'"));
-        Schedules.setWeekly(bob, refresh(vassal), everyDay('work', 'o:' + weaver));
+        learn(vassal.id, 'Service');
+        const servant = Number(scalar("SELECT id FROM game_occupations WHERE title = 'Servant'"));
+        Schedules.setWeekly(bob, refresh(vassal), everyDay('work', 'o:' + servant));
         db().run("UPDATE game_goods SET quantity = 3 WHERE anthro_id = ? AND good = 'food'", [vassal.id]);
 
         const theirs = byLabel(Finances.report(refresh(vassal)).lines);
@@ -84,6 +84,6 @@ describe('Finances', () => {
         expect(notificationsFor(owner.id)).toContain('Alice gave Serf 3 food, for your store.');
         expect(Finances.donate(alice, serf.id, 'food', 5)).toBe('You have only 4 food.');
         expect(Finances.donate(alice, me.id, 'coins', 1)).toBe("You can't give to yourself.");
-        expect(Finances.donate(alice, serf.id, 'gold', 1)).toBe('Choose what to give.');
+        expect(Finances.donate(alice, serf.id, 'unobtainium', 1)).toBe('Choose what to give.');
     });
 });

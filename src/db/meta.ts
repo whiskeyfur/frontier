@@ -220,7 +220,8 @@ export const COLUMNS: Record<string, Record<string, string>> = {
         "name": "varchar",
         "buy_price": "int",
         "sell_price": "int",
-        "sort_order": "int"
+        "sort_order": "int",
+        "edible": "tinyint"
     },
     "game_names": {
         "id": "int",
@@ -281,6 +282,19 @@ export const COLUMNS: Record<string, Record<string, string>> = {
         "is_noble": "tinyint",
         "is_hereditary": "tinyint"
     },
+    "game_recipe_goods": {
+        "recipe_id": "int",
+        "good": "varchar",
+        "quantity": "smallint",
+        "role": "enum"
+    },
+    "game_recipes": {
+        "id": "int",
+        "occupation_id": "int",
+        "name": "varchar",
+        "needs_acres": "decimal",
+        "sort_order": "int"
+    },
     "game_renames": {
         "id": "int",
         "anthro_id": "int",
@@ -315,6 +329,7 @@ export const COLUMNS: Record<string, Record<string, string>> = {
         "group_id": "int",
         "skill_id": "int",
         "occupation_id": "int",
+        "recipe_id": "int",
         "part_id": "int",
         "building_id": "int",
         "set_by": "int"
@@ -333,6 +348,7 @@ export const COLUMNS: Record<string, Record<string, string>> = {
         "group_id": "int",
         "skill_id": "int",
         "occupation_id": "int",
+        "recipe_id": "int",
         "part_id": "int",
         "building_id": "int",
         "set_by": "int"
@@ -365,6 +381,7 @@ export const COLUMNS: Record<string, Record<string, string>> = {
         "group_id": "int",
         "skill_id": "int",
         "occupation_id": "int",
+        "recipe_id": "int",
         "part_id": "int",
         "building_id": "int",
         "set_by": "int"
@@ -801,6 +818,24 @@ export const FOREIGN_KEYS: ForeignKey[] = [
         "referencedColumn": "id"
     },
     {
+        "table": "game_recipe_goods",
+        "column": "recipe_id",
+        "references": "game_recipes",
+        "referencedColumn": "id"
+    },
+    {
+        "table": "game_recipe_goods",
+        "column": "good",
+        "references": "game_market_goods",
+        "referencedColumn": "good"
+    },
+    {
+        "table": "game_recipes",
+        "column": "occupation_id",
+        "references": "game_occupations",
+        "referencedColumn": "id"
+    },
+    {
         "table": "game_renames",
         "column": "anthro_id",
         "references": "game_anthros",
@@ -885,6 +920,12 @@ export const FOREIGN_KEYS: ForeignKey[] = [
         "referencedColumn": "id"
     },
     {
+        "table": "game_schedule_days",
+        "column": "recipe_id",
+        "references": "game_recipes",
+        "referencedColumn": "id"
+    },
+    {
         "table": "game_schedule_log",
         "column": "anthro_id",
         "references": "game_anthros",
@@ -939,6 +980,12 @@ export const FOREIGN_KEYS: ForeignKey[] = [
         "referencedColumn": "id"
     },
     {
+        "table": "game_schedule_weekly",
+        "column": "recipe_id",
+        "references": "game_recipes",
+        "referencedColumn": "id"
+    },
+    {
         "table": "game_species",
         "column": "group_id",
         "references": "game_species_groups",
@@ -990,6 +1037,12 @@ export const FOREIGN_KEYS: ForeignKey[] = [
         "table": "game_standard_days",
         "column": "set_by",
         "references": "users",
+        "referencedColumn": "id"
+    },
+    {
+        "table": "game_standard_days",
+        "column": "recipe_id",
+        "references": "game_recipes",
         "referencedColumn": "id"
     },
     {

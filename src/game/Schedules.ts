@@ -8,23 +8,27 @@ import type { Db, Row } from '../db/Db';
 import { Anthros } from './Anthros';
 import { Buildings } from './Buildings';
 import { Clock } from './Clock';
+import { Crafts, type Recipe } from './Crafts';
 import { Goods } from './Goods';
 import { Groups } from './Groups';
 import { Land } from './Land';
 import { Litters } from './Litters';
+import { Market } from './Market';
 import { Preferences } from './Preferences';
 import { Wallets } from './Wallets';
 
 /**
  * What a user can plan for an anthro (see Schedules.options, groupOptions): partners (anthro rows), groups (Map of
- * group id => name), skills (Map of id => name), occupations (Map of id => occupation), places (Map of part id =>
- * "Barony: Expanse"), sites (building rows), learned (skill ids, or null).
+ * group id => name), skills (Map of id => name), occupations (Map of id => occupation), recipes (Map of occupation id
+ * => recipes: see Crafts.byOccupation), places (Map of part id => "Barony: Expanse"), sites (building rows), learned
+ * (skill ids, or null).
  */
 export type PlanOptions = {
     partners: Row[];
     groups: Map<number, string>;
     skills: Map<number, string>;
     occupations: Map<number, Row>;
+    recipes: Map<number, Recipe[]>;
     places: Map<number, string>;
     sites: Row[];
     learned: number[] | null;
@@ -50,20 +54,22 @@ export type TodaysWork = { outcomes: Map<number, string>; gathered: Map<number, 
  *  - breeding with the chosen partner (or a random other member of the chosen breeding group; the pair take the
  *    roles they can, and rule breaking is recorded with no litter, as always);
  *  - training at a skill, or working at an occupation (each has a skill: a Baker's is Cooking): a day's practice at
- *    the skill (see LEVELS); work also earns PAY coins, by level, but only once the anthro has learned the skill
- *    (trained or worked at it for WORK_MIN_PRACTICE days: see knows);
+ *    the skill (see LEVELS), but work only once the anthro has learned the skill (trained or worked at it for
+ *    WORK_MIN_PRACTICE days: see learned). A producer or craftsman makes its recipe's goods, by level, from the
+ *    materials it needs (see Crafts); a service job makes nothing, and earns PAY coins by level instead;
  *  - work that takes no skill: clearing land (CLEAR_ACRES a day, in the wilds or an expanse, added to the master's land
  *    there, and CLEAR_LUMBER lumber), building (a day's work on a building on the master's land, using a lumber from
  *    the master's store: see Buildings) or foraging (FORAGE_FOOD food);
  *  - or rest.
- * What work makes (coins, land, lumber, food) goes to whoever the anthro works for: its master (see masterOf; a slave's
- * owner). A hungry anthro (see Goods) can only rest or forage that day.
+ * What work makes (coins, goods, land) goes to whoever the anthro works for, and its materials come from there: its
+ * master (see masterOf; a slave's owner). A hungry anthro (see Goods) can only rest or forage that day.
  *
  * An anthro nobody has planned has a default day by age (see defaultPlan, runDefaults): a newborn rests (its days
  * can't be planned: see isResting); a youngster learns a trade from its father (a boy) or mother (a girl) until it's a
  * Journeyman at it, then works it. One that keeps itself (see isIndependent) lives by a trade, a random one if it has
- * none, as a Journeyman (see tradeOf), foraging when it has neither food nor the coins for a meal; and it buys food with
- * what it earns, up to a week's.
+ * none, as a Journeyman (see tradeOf), foraging when it has neither food nor the coins for a meal. It buys the
+ * materials its trade needs, sells what it makes (keeping what it can eat), and buys food with what it has, up to a
+ * week's.
  */
 export class Schedules {
     // The activities to choose from; work covers working at an occupation, clearing land, building and foraging.
@@ -77,7 +83,7 @@ export class Schedules {
     static readonly CLEAR_ACRES = 0.25;
     static readonly CLEAR_LUMBER = 2;
     static readonly FORAGE_FOOD = [1, 3];
-    // Coins a day's work at an occupation earns, by the worker's level at its skill.
+    // Coins a day's service work (an occupation with no recipe: see Crafts) earns, by the worker's level at its skill.
     static readonly PAY: Record<string, number> = { Novice: 2, Apprentice: 4, Journeyman: 8, Master: 15 };
     // Days of practice at a skill before an anthro can work at its occupations: training first, then work.
     static readonly WORK_MIN_PRACTICE = 1;
@@ -303,7 +309,9 @@ export class Schedules {
     }
 
     private static randomTrade(): Row | null {
-        const base = [...Schedules.occupations().values()].filter((o) => o.era === undefined || o.era === null);
+        // Of every era, and not one that needs land to work (a farmer: see Crafts), which it may not have.
+        const base = [...Schedules.occupations().values()].filter((o) => (o.era === undefined || o.era === null)
+            && !Crafts.recipesOf(int(o.id)).some((r) => r.needs_acres !== null));
         return base.length ? pick(base) : null;
     }
 
@@ -352,7 +360,7 @@ export class Schedules {
                 continue;
             }
             const price = Goods.mealPrice();
-            const broke = Goods.amount(anthro.id) < Goods.FOOD_PER_DAY && (price === null || Wallets.balance(anthro.id) < price);
+            const broke = Goods.food(anthro.id) < Goods.FOOD_PER_DAY && (price === null || Wallets.balance(anthro.id) < price);
             if (independent && (plan.activity === 'rest' || broke || Goods.isHungry(anthro))) {
                 plan = { activity: 'forage' };
             }
@@ -361,11 +369,14 @@ export class Schedules {
                 outcome = 'Too hungry to ' + Schedules.LABELS[plan.activity].toLowerCase() + ': rested.';
                 plan = { activity: 'rest' };
             } else {
-                outcome = Schedules.carryOut(anthro, plan);
+                outcome = Schedules.carryOut(anthro, plan, independent);
+            }
+            if (independent) {
+                outcome += Schedules.sellMade(anthro, plan);
             }
             if (independent && price) {
                 // Food for the week ahead, with what it has.
-                const short = Schedules.INDEPENDENT_FOOD_DAYS * Goods.FOOD_PER_DAY - Goods.amount(anthro.id);
+                const short = Schedules.INDEPENDENT_FOOD_DAYS * Goods.FOOD_PER_DAY - Goods.food(anthro.id);
                 const buy = short > 0 ? Math.min(short, intdiv(Math.max(0, Wallets.balance(anthro.id)), price)) : 0;
                 if (buy > 0 && Wallets.change(anthro.id, -buy * price, `Bought ${buy} food at the market`)) {
                     Goods.add(anthro.id, 'food', buy);
@@ -406,7 +417,7 @@ export class Schedules {
 
     /**
      * Everything the user can plan for the anthro, beyond rest: {partners (anthros the user can breed it with: ones
-     * they have or employ, see Anthros::breedable; only if they decide its breeding), groups (Map of id => name, its
+     * they have, see Anthros::breedable; only if they decide its breeding), groups (Map of id => name, its
      * breeding groups; likewise), skills, occupations, places (expanses to clear, Map of part id => "Barony: Expanse"),
      * sites (unfinished buildings on its master's land)}.
      */
@@ -430,6 +441,8 @@ export class Schedules {
             // Skills and occupations of the user's era (see Preferences).
             skills: Schedules.skills(Preferences.era(user.id)),
             occupations: Schedules.occupations(Preferences.era(user.id)),
+            // What each producing or crafting occupation can make (see Crafts): Map of occupation id => recipes.
+            recipes: Crafts.byOccupation(),
             places,
             sites: master ? (Buildings.heldBy(master.id) as Row[]).filter((b) => b.finished_at == null) : [],
             // The skills it can work at already; the other occupations need training first (see learned).
@@ -458,7 +471,7 @@ export class Schedules {
         // No 'learned': each anthro's own skills decide whether it can work on the day (see carryOut).
         return {
             ...(player ? Schedules.options(user, player) : {
-                skills: Schedules.skills(era), occupations: Schedules.occupations(era), places: new Map<number, string>(), sites: [],
+                skills: Schedules.skills(era), occupations: Schedules.occupations(era), recipes: Crafts.byOccupation(), places: new Map<number, string>(), sites: [],
             }),
             partners: mine, groups, learned: null,
         };
@@ -839,9 +852,34 @@ export class Schedules {
     }
 
     /**
-     * Does the day's plan. Returns what came of it, for the anthro's log.
+     * An anthro that keeps itself sells what it has made, at the market's sell prices: everything but what it eats and
+     * what its trade uses. Returns what it sold, as a sentence (or '').
      */
-    private static carryOut(anthro: Row, plan: Row): string {
+    private static sellMade(anthro: Row, plan: Row): string {
+        let keep = Goods.edibles();
+        let recipe: Recipe | null;
+        if ((plan.occupation_id ?? null) !== null && (recipe = Crafts.recipeFor(int(plan.occupation_id), plan.recipe_id ?? null))) {
+            keep = [...keep, ...Object.keys(recipe.in)];
+        }
+        const sold: string[] = [];
+        for (const [good, row] of Object.entries(Market.goods())) {
+            const quantity = Goods.amount(anthro.id, good);
+            if (quantity < 1 || keep.includes(good) || row.sell_price === null) {
+                continue;
+            }
+            if (Goods.take(anthro.id, good, quantity)) {
+                Wallets.change(anthro.id, quantity * int(row.sell_price), `Sold ${quantity} ` + Crafts.goodName(good) + ' at the market');
+                sold.push(quantity + ' ' + Crafts.goodName(good));
+            }
+        }
+        return sold.length ? ' Sold ' + sold.join(', ') + '.' : '';
+    }
+
+    /**
+     * Does the day's plan (an anthro that keeps itself, buys, buys the materials its work needs: see Crafts::work).
+     * Returns what came of it, for the anthro's log.
+     */
+    private static carryOut(anthro: Row, plan: Row, buys = false): string {
         switch (plan.activity) {
             case 'birthing':
                 return 'Gave birth.';
@@ -859,8 +897,22 @@ export class Schedules {
                 if (!Schedules.learned(anthro.id).includes(int(plan.occupation_skill_id))) {
                     return `Meant to work as ${plan.occupation_title}, but hasn't trained at ${plan.occupation_skill} yet: rested.`;
                 }
-                const level = Schedules.practise(anthro, int(plan.occupation_skill_id));
                 const master = Schedules.masterOf(anthro);
+                // A producer or craftsman makes goods (see Crafts): its pay. Short of materials or land, it rests.
+                const recipe = Crafts.recipeFor(int(plan.occupation_id), plan.recipe_id ?? null);
+                if (recipe) {
+                    const practice = Auth.db().value('SELECT practice FROM game_anthro_skills WHERE anthro_id = ? AND skill_id = ?', [anthro.id, plan.occupation_skill_id]);
+                    const [outcome, made] = Crafts.work(anthro, plan, recipe, Schedules.level(int(practice)), master, buys);
+                    if (made === null) {
+                        return outcome;
+                    }
+                    Schedules.practise(anthro, int(plan.occupation_skill_id));
+                    for (const [good, quantity] of Object.entries(made)) {
+                        Schedules.gathered(master!.id, good, quantity);
+                    }
+                    return outcome;
+                }
+                const level = Schedules.practise(anthro, int(plan.occupation_skill_id));
                 const pay = Schedules.PAY[level];
                 if (master) {
                     Wallets.change(master.id, pay, `${anthro.name} worked as ${plan.occupation_title}`);
@@ -933,9 +985,10 @@ export class Schedules {
         if (partId !== null) {
             baronyId = int(db.value('SELECT barony_id FROM game_barony_parts WHERE id = ?', [partId]));
         }
-        // MariaDB's null-safe <=> is SQLite's IS.
+        // Its own land there (never a fief: land held of a lord isn't the clearer's to grow). MariaDB's null-safe <=> is
+        // SQLite's IS.
         let lotId = db.value(
-            'SELECT id FROM game_parcels WHERE anthro_id = ? AND barony_id IS ? AND part_id IS ? ORDER BY acres DESC, id LIMIT 1',
+            'SELECT id FROM game_parcels WHERE anthro_id = ? AND held_of IS NULL AND barony_id IS ? AND part_id IS ? ORDER BY acres DESC, id LIMIT 1',
             [master.id, baronyId, partId],
         );
         if (lotId) {
@@ -992,7 +1045,7 @@ export class Schedules {
         }
         // Take the roles the pair can fill; a pair that can't is still recorded, with no litter.
         const [sire, dam] = !anthro.is_male && partner!.is_male ? [partner!, anthro] : [anthro, partner!];
-        const outcome = Litters.attempt(sire, dam, planner?.id ?? null, false, null, groupId);
+        const outcome = Litters.attempt(sire, dam, planner?.id ?? null, false, groupId);
         return `Bred with ${partner!.name}: ` + (outcome.litter
             ? `${dam.name} is expecting a litter of ${outcome.litter.cubs}.`
             : `no litter (${outcome.barren}).`);
@@ -1003,7 +1056,7 @@ export class Schedules {
      * schedule; who is whose plan it is, for messages): [row (activity and DETAILS), null] or [null, error message].
      * detail names who or what:
      * to breed, "p:<anthro id>" or "g:<group id>"; to train, "s:<skill id>"; to work, "o:<occupation id>" (at an
-     * occupation), "c:<part id>" or "c:wilds" (clearing an expanse or the wilds), "b:<building id>" (building) or "f"
+     * occupation; "o:<occupation id>:<recipe id>" for one of its recipes: see Crafts), "c:<part id>" or "c:wilds" (clearing an expanse or the wilds), "b:<building id>" (building) or "f"
      * (foraging).
      */
     private static checked(options: PlanOptions, who: string, activity: string, detail: string): [Row | null, string | null] {
@@ -1033,8 +1086,14 @@ export class Schedules {
                 ? [{ ...row, skill_id: int(id) }, null]
                 : [null, 'Choose a skill to train.'];
         }
-        if (kind === 'o' && options.occupations.has(int(id))) {
-            return [{ ...row, occupation_id: int(id) }, null];
+        if (kind === 'o') {
+            // array_pad(array_map('intval', explode(':', $id, 2)), 2, 0)
+            const at = id.indexOf(':');
+            const [occupationId, recipeId] = at < 0 ? [int(id), 0] : [int(id.slice(0, at)), int(id.slice(at + 1))];
+            const recipes = (options.recipes?.get(occupationId) ?? Crafts.recipesOf(occupationId)).map((r) => r.id);
+            if (options.occupations.has(occupationId) && (!recipeId || recipes.includes(recipeId))) {
+                return [{ ...row, occupation_id: occupationId, recipe_id: recipeId || null }, null];
+            }
         }
         if (kind === 'c' && id === 'wilds') {
             return [{ ...row, activity: 'clear' }, null];
@@ -1068,16 +1127,17 @@ export class Schedules {
     }
 
     // A plan's who and what.
-    private static readonly DETAILS = ['partner_anthro_id', 'group_id', 'skill_id', 'occupation_id', 'part_id', 'building_id'];
+    private static readonly DETAILS = ['partner_anthro_id', 'group_id', 'skill_id', 'occupation_id', 'recipe_id', 'part_id', 'building_id'];
     // A plan's columns, with the names of its partner, group, skill, occupation, place and building.
     private static readonly PLAN_SELECT = `SELECT p.*, pa.name AS partner_name, g.name AS group_name, s.name AS skill_name,
-                                        o.title AS occupation_title, os.name AS occupation_skill, o.skill_id AS occupation_skill_id,
+                                        o.title AS occupation_title, os.name AS occupation_skill, o.skill_id AS occupation_skill_id, r.name AS recipe_name,
                                         pt.name AS part_name, bt.name AS building_name, bl.parcel_id AS building_lot`;
     private static readonly PLAN_JOINS = ` LEFT JOIN game_anthros pa ON pa.id = p.partner_anthro_id
                                  LEFT JOIN game_breeding_groups g ON g.id = p.group_id
                                  LEFT JOIN game_skills s ON s.id = p.skill_id
                                  LEFT JOIN game_occupations o ON o.id = p.occupation_id
                                  LEFT JOIN game_skills os ON os.id = o.skill_id
+                                 LEFT JOIN game_recipes r ON r.id = p.recipe_id
                                  LEFT JOIN game_barony_parts pt ON pt.id = p.part_id
                                  LEFT JOIN game_buildings bl ON bl.id = p.building_id
                                  LEFT JOIN game_building_types bt ON bt.id = bl.type_id`;

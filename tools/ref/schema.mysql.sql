@@ -515,6 +515,7 @@ CREATE TABLE `game_market_goods` (
   `buy_price` int(10) unsigned DEFAULT NULL,
   `sell_price` int(10) unsigned DEFAULT NULL,
   `sort_order` int(11) NOT NULL DEFAULT 0,
+  `edible` tinyint(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`good`),
   UNIQUE KEY `name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -640,6 +641,32 @@ CREATE TABLE `game_ranks` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `game_recipe_goods` (
+  `recipe_id` int(10) unsigned NOT NULL,
+  `good` varchar(20) NOT NULL,
+  `quantity` smallint(5) unsigned NOT NULL,
+  `role` enum('in','out') NOT NULL,
+  PRIMARY KEY (`recipe_id`,`role`,`good`),
+  KEY `good` (`good`),
+  CONSTRAINT `game_recipe_goods_ibfk_1` FOREIGN KEY (`recipe_id`) REFERENCES `game_recipes` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `game_recipe_goods_ibfk_2` FOREIGN KEY (`good`) REFERENCES `game_market_goods` (`good`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `game_recipes` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `occupation_id` int(10) unsigned NOT NULL,
+  `name` varchar(40) NOT NULL,
+  `needs_acres` decimal(10,2) DEFAULT NULL,
+  `sort_order` int(11) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  KEY `occupation_id` (`occupation_id`),
+  CONSTRAINT `game_recipes_ibfk_1` FOREIGN KEY (`occupation_id`) REFERENCES `game_occupations` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=46 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `game_renames` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `anthro_id` int(10) unsigned NOT NULL,
@@ -699,6 +726,7 @@ CREATE TABLE `game_schedule_days` (
   `group_id` int(10) unsigned DEFAULT NULL,
   `skill_id` int(10) unsigned DEFAULT NULL,
   `occupation_id` int(10) unsigned DEFAULT NULL,
+  `recipe_id` int(10) unsigned DEFAULT NULL,
   `part_id` int(10) unsigned DEFAULT NULL,
   `building_id` int(10) unsigned DEFAULT NULL,
   `set_by` int(10) unsigned DEFAULT NULL,
@@ -710,6 +738,7 @@ CREATE TABLE `game_schedule_days` (
   KEY `occupation_id` (`occupation_id`),
   KEY `part_id` (`part_id`),
   KEY `building_id` (`building_id`),
+  KEY `recipe_id` (`recipe_id`),
   CONSTRAINT `game_schedule_days_ibfk_1` FOREIGN KEY (`anthro_id`) REFERENCES `game_anthros` (`id`) ON DELETE CASCADE,
   CONSTRAINT `game_schedule_days_ibfk_2` FOREIGN KEY (`partner_anthro_id`) REFERENCES `game_anthros` (`id`) ON DELETE SET NULL,
   CONSTRAINT `game_schedule_days_ibfk_3` FOREIGN KEY (`group_id`) REFERENCES `game_breeding_groups` (`id`) ON DELETE SET NULL,
@@ -717,7 +746,8 @@ CREATE TABLE `game_schedule_days` (
   CONSTRAINT `game_schedule_days_ibfk_5` FOREIGN KEY (`set_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `game_schedule_days_ibfk_6` FOREIGN KEY (`occupation_id`) REFERENCES `game_occupations` (`id`) ON DELETE SET NULL,
   CONSTRAINT `game_schedule_days_ibfk_7` FOREIGN KEY (`part_id`) REFERENCES `game_barony_parts` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `game_schedule_days_ibfk_8` FOREIGN KEY (`building_id`) REFERENCES `game_buildings` (`id`) ON DELETE SET NULL
+  CONSTRAINT `game_schedule_days_ibfk_8` FOREIGN KEY (`building_id`) REFERENCES `game_buildings` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `game_schedule_days_ibfk_9` FOREIGN KEY (`recipe_id`) REFERENCES `game_recipes` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -741,6 +771,7 @@ CREATE TABLE `game_schedule_weekly` (
   `group_id` int(10) unsigned DEFAULT NULL,
   `skill_id` int(10) unsigned DEFAULT NULL,
   `occupation_id` int(10) unsigned DEFAULT NULL,
+  `recipe_id` int(10) unsigned DEFAULT NULL,
   `part_id` int(10) unsigned DEFAULT NULL,
   `building_id` int(10) unsigned DEFAULT NULL,
   `set_by` int(10) unsigned DEFAULT NULL,
@@ -752,6 +783,7 @@ CREATE TABLE `game_schedule_weekly` (
   KEY `occupation_id` (`occupation_id`),
   KEY `part_id` (`part_id`),
   KEY `building_id` (`building_id`),
+  KEY `recipe_id` (`recipe_id`),
   CONSTRAINT `game_schedule_weekly_ibfk_1` FOREIGN KEY (`anthro_id`) REFERENCES `game_anthros` (`id`) ON DELETE CASCADE,
   CONSTRAINT `game_schedule_weekly_ibfk_2` FOREIGN KEY (`partner_anthro_id`) REFERENCES `game_anthros` (`id`) ON DELETE SET NULL,
   CONSTRAINT `game_schedule_weekly_ibfk_3` FOREIGN KEY (`group_id`) REFERENCES `game_breeding_groups` (`id`) ON DELETE SET NULL,
@@ -759,7 +791,8 @@ CREATE TABLE `game_schedule_weekly` (
   CONSTRAINT `game_schedule_weekly_ibfk_5` FOREIGN KEY (`set_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `game_schedule_weekly_ibfk_6` FOREIGN KEY (`occupation_id`) REFERENCES `game_occupations` (`id`) ON DELETE SET NULL,
   CONSTRAINT `game_schedule_weekly_ibfk_7` FOREIGN KEY (`part_id`) REFERENCES `game_barony_parts` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `game_schedule_weekly_ibfk_8` FOREIGN KEY (`building_id`) REFERENCES `game_buildings` (`id`) ON DELETE SET NULL
+  CONSTRAINT `game_schedule_weekly_ibfk_8` FOREIGN KEY (`building_id`) REFERENCES `game_buildings` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `game_schedule_weekly_ibfk_9` FOREIGN KEY (`recipe_id`) REFERENCES `game_recipes` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -813,6 +846,7 @@ CREATE TABLE `game_standard_days` (
   `group_id` int(10) unsigned DEFAULT NULL,
   `skill_id` int(10) unsigned DEFAULT NULL,
   `occupation_id` int(10) unsigned DEFAULT NULL,
+  `recipe_id` int(10) unsigned DEFAULT NULL,
   `part_id` int(10) unsigned DEFAULT NULL,
   `building_id` int(10) unsigned DEFAULT NULL,
   `set_by` int(10) unsigned DEFAULT NULL,
@@ -824,6 +858,7 @@ CREATE TABLE `game_standard_days` (
   KEY `part_id` (`part_id`),
   KEY `building_id` (`building_id`),
   KEY `set_by` (`set_by`),
+  KEY `recipe_id` (`recipe_id`),
   CONSTRAINT `game_standard_days_ibfk_1` FOREIGN KEY (`schedule_id`) REFERENCES `game_standard_schedules` (`id`) ON DELETE CASCADE,
   CONSTRAINT `game_standard_days_ibfk_2` FOREIGN KEY (`partner_anthro_id`) REFERENCES `game_anthros` (`id`) ON DELETE SET NULL,
   CONSTRAINT `game_standard_days_ibfk_3` FOREIGN KEY (`group_id`) REFERENCES `game_breeding_groups` (`id`) ON DELETE SET NULL,
@@ -831,7 +866,8 @@ CREATE TABLE `game_standard_days` (
   CONSTRAINT `game_standard_days_ibfk_5` FOREIGN KEY (`occupation_id`) REFERENCES `game_occupations` (`id`) ON DELETE SET NULL,
   CONSTRAINT `game_standard_days_ibfk_6` FOREIGN KEY (`part_id`) REFERENCES `game_barony_parts` (`id`) ON DELETE SET NULL,
   CONSTRAINT `game_standard_days_ibfk_7` FOREIGN KEY (`building_id`) REFERENCES `game_buildings` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `game_standard_days_ibfk_8` FOREIGN KEY (`set_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+  CONSTRAINT `game_standard_days_ibfk_8` FOREIGN KEY (`set_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `game_standard_days_ibfk_9` FOREIGN KEY (`recipe_id`) REFERENCES `game_recipes` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;

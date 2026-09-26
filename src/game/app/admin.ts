@@ -1,6 +1,6 @@
 // Upstream: game/src/App.php (the /game/admin pages: manageSpecies, manageGenders, manageRanks, showRank,
 // listUnowned, forceBreed, supply, advanceTime, resetGame, manageNames, manageSaves, downloadSave, landOffice,
-// moveLots, manageBuildings, manageGoods, manageBaronies, allNotifications, manageResets, manageWallets)
+// moveLots, manageBuildings, manageGoods, manageRecipes, manageBaronies, allNotifications, manageResets, manageWallets)
 import type { User } from '../../core/Auth';
 import { Auth } from '../../core/Auth';
 import { resetCaches } from '../../core/caches';
@@ -13,6 +13,7 @@ import { Auctions } from '../Auctions';
 import { Baronies } from '../Baronies';
 import { Board } from '../Board';
 import { Buildings } from '../Buildings';
+import { Crafts } from '../Crafts';
 import { Genders } from '../Genders';
 import { Jobs } from '../Jobs';
 import { Land } from '../Land';
@@ -41,6 +42,7 @@ import savesView from '../views/admin/saves';
 import landView from '../views/admin/land';
 import buildingsView from '../views/admin/buildings';
 import goodsView from '../views/admin/goods';
+import recipesView from '../views/admin/recipes';
 import baroniesView from '../views/admin/baronies';
 import notificationsView from '../views/admin/notifications';
 import resetsView from '../views/admin/resets';
@@ -151,7 +153,7 @@ export function forceBreed(app: App, user: User, post: boolean): void {
     let error: string | null = null;
     if (post) {
         let outcome;
-        [outcome, error] = Anthros.forceBreed(sireId, damId, 0, user.id);
+        [outcome, error] = Anthros.forceBreed(sireId, damId, user.id);
         if (error === null) {
             // (A forced breeding's outcome is Litters.attempt's: no attempts or took, so breedingMessage reads one attempt.)
             Session.data.flash = breedingMessage(sireId, damId, outcome as BreedOutcome);
@@ -169,8 +171,7 @@ export function supply(app: App, user: User, post: boolean): void {
         // Blank (or "random") fields are chosen at random for each worker.
         const pick = (name: string): number | null => (['', 'random'].includes(field(app.post, name)) ? null : int(field(app.post, name)));
         let count;
-        [count, error] = Jobs.supply(int(field(app.post, 'count', '0')), pick('skill_id'),
-            pick('breedable') === null ? null : !!pick('breedable'), pick('wage'));
+        [count, error] = Jobs.supply(int(field(app.post, 'count', '0')), pick('skill_id'), pick('wage'));
         if (error === null) {
             Session.data.flash = `Put ${count} ` + (count === 1 ? 'worker' : 'workers') + ' on the job market.';
             app.redirect('/game/market/jobs');
@@ -393,7 +394,7 @@ export function manageGoods(app: App, user: User, post: boolean): void {
         switch (action) {
             case 'save':
                 error = Market.save(key, field(app.post, 'name'), field(app.post, 'buy_price'),
-                    field(app.post, 'sell_price'), int(field(app.post, 'sort_order', '0')));
+                    field(app.post, 'sell_price'), int(field(app.post, 'sort_order', '0')), !empty(app.post.edible));
                 break;
             case 'delete': error = Market.delete(key ?? ''); break;
             default: error = 'Unknown action.';
@@ -405,6 +406,30 @@ export function manageGoods(app: App, user: User, post: boolean): void {
     }
     const stock = Auth.db().pairs('SELECT good, SUM(quantity) FROM game_goods GROUP BY good');
     app.echo(app.render(goodsView, user, { goods: Market.goods(), stock, error }));
+}
+
+/**
+ * Admin: what each occupation makes, from what (see Crafts).
+ */
+export function manageRecipes(app: App, user: User, post: boolean): void {
+    let error: string | null = null;
+    if (post) {
+        const action = field(app.post, 'action');
+        const id = field(app.post, 'recipe_id') === '' ? null : int(field(app.post, 'recipe_id'));
+        if (action === 'delete') {
+            Crafts.delete(int(id));
+        } else {
+            error = action === 'save' ? Crafts.save(id, int(field(app.post, 'occupation_id', '0')), field(app.post, 'name'),
+                field(app.post, 'acres'), field(app.post, 'inputs'), field(app.post, 'outputs')) : 'Unknown action.';
+        }
+        if (error === null) {
+            Session.data.flash = action === 'delete' ? 'The recipe was removed.' : 'Saved.';
+            app.redirect('/game/admin/recipes#occupation-' + int(field(app.post, 'occupation_id', '0')));
+        }
+    }
+    app.echo(app.render(recipesView, user, {
+        occupations: Schedules.occupations(), recipes: Crafts.byOccupation(), error,
+    }));
 }
 
 export function manageBaronies(app: App, user: User, post: boolean): void {

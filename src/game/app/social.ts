@@ -135,7 +135,9 @@ export function notifications(app: App, user: User, post: boolean): void {
         // A row's own Delete button sends "only"; "Delete selected" sends the ticked ids.
         const ids = app.post.only !== undefined ? [int(app.post.only)] : fieldList(app.post, 'ids');
         const deleted = Notifications.delete(user, ids);
-        Session.data.flash = deleted ? `Deleted ${deleted} ` + (deleted === 1 ? 'notification' : 'notifications') + '.'
+        // Deleting only hides them from you: administrators can still review them (see the privacy policy).
+        Session.data.flash = deleted ? `Deleted ${deleted} ` + (deleted === 1 ? 'notification' : 'notifications')
+            + '. They\'re gone from your list, but administrators can still review them.'
             : 'Select some notifications first.';
         app.redirect('/game/notifications');
     }

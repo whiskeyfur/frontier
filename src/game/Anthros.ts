@@ -68,7 +68,7 @@ export class Anthros {
                                    a.title_rank, a.title_since, a.title_by_land, a.granted_rank, a.tax_rate, a.tax_balance, a.tax_overdue_since, a.liege_id, lg.name AS liege_name,
                                    a.spouse_of, hd.name AS spouse_of_name,
                                    IF(hd.owner_id = hd.id AND hd.died_at IS NULL, hd.title_rank, NULL) AS consort_rank,
-                                   a.wage, a.hire_breedable, a.employer_id, e.name AS employer_name, e.player_id AS employer_player_id,
+                                   a.wage, a.employer_id, e.name AS employer_name, e.player_id AS employer_player_id,
                                    a.employed_wage, a.employed_since, a.paid_until,
                                    a.sire_id, s.name AS sire_name,
                                    s.owner_id AS sire_owner_id, IF(s.owner_id = s.id, NULL, so.name) AS sire_owner_name, so.player_id AS sire_owner_player_id,
@@ -126,19 +126,17 @@ export class Anthros {
     }
 
     /**
-     * Who the user can breed: everything they own, and their employees.
+     * Who the user can breed: everything they own. (Employees are hired to work: an employer can't breed them.)
      */
     static breedable(ownerId: number): Row[] {
-        // Employees only if they were hired on terms that let their employer breed them.
-        return [...Anthros.forOwner(ownerId), ...Anthros.employedBy(ownerId).filter((a) => a.hire_breedable)];
+        return Anthros.forOwner(ownerId);
     }
 
     /**
-     * Whether the user decides the anthro's breeding: they have it (see isOwner), or employ it on terms that let them
-     * breed it.
+     * Whether the user decides the anthro's breeding: they have it (see isOwner).
      */
     static mayBreed(user: Row, anthro: Row): boolean {
-        return Anthros.isOwner(user, anthro) || (Anthros.isEmployer(user, anthro) && !!anthro.hire_breedable);
+        return Anthros.isOwner(user, anthro);
     }
 
     /**
@@ -975,14 +973,11 @@ export class Anthros {
     }
 
     /**
-     * One of the anthros the user can breed: one they have (see forOwner) or employ on terms that let them breed it.
+     * One of the anthros the user can breed: one they have (see forOwner).
      */
     static findControlled(userId: number, id: number): Row | null {
         const me = Wallets.anthroFor(userId);
-        const row = Auth.db().row(
-            Anthros.SELECT + ' WHERE (a.owner_id = ? OR (a.employer_id = ? AND a.hire_breedable)) AND a.id = ?',
-            [me, me, id],
-        );
+        const row = Auth.db().row(Anthros.SELECT + ' WHERE a.owner_id = ? AND a.id = ?', [me, id]);
         return row ? Anthros.withFlags(row) : null;
     }
 
@@ -1079,7 +1074,7 @@ export class Anthros {
     }
 
     /**
-     * Breeds two of the user's anthros or employees times times (1 to Litters::MAX_CUBS, stopping once the dam's
+     * Breeds two of the user's anthros times times (1 to Litters::MAX_CUBS, stopping once the dam's
      * litter is full). A pair that breaks the rules (see barrenReason()) is still bred and recorded, but produces no
      * litter; otherwise each try adds a cub to the dam's litter. Only choosing anthros the user doesn't control, the
      * same anthro twice, or one that's up for auction is refused.
@@ -1093,7 +1088,7 @@ export class Anthros {
         const sire = Anthros.findControlled(ownerId, sireId);
         const dam = Anthros.findControlled(ownerId, damId);
         if (!sire || !dam) {
-            return [null, 'Choose a sire and a dam from your anthros and employees.'];
+            return [null, 'Choose a sire and a dam from your anthros.'];
         }
         if (sire.id === dam.id) {
             return [null, 'The sire and dam must be different anthros.'];
@@ -1108,10 +1103,7 @@ export class Anthros {
         if (refusal) {
             return [null, refusal];
         }
-        // Cubs of a dam the breeder doesn't have (an employee) belong to the breeder's anthro.
-        const me = Wallets.anthroFor(ownerId);
-        const cubsTo = dam.owner_id === me || dam.id === me ? null : me;
-        return [Anthros.tries(sire, dam, ownerId, times, cubsTo), null];
+        return [Anthros.tries(sire, dam, ownerId, times), null];
     }
 
     /**
@@ -1124,7 +1116,7 @@ export class Anthros {
     /**
      * A herm breeds itself: up to cubs tries (1 to Litters::MAX_CUBS; its own limit is secret), stopping once its
      * litter is full. The usual rules apply (fertile, its conceiving day...). The user must decide its breeding, as for
-     * breed(): they have it (the anthro they play, while it's free, or one it owns) or employ it.
+     * breed(): they have it (the anthro they play, while it's free, or one it owns).
      * Returns [as breed() does, null] or [null, error message].
      */
     static selfBreed(user: Row, anthroId: number, cubs: number): [BreedOutcome | null, string | null] {
@@ -1146,17 +1138,17 @@ export class Anthros {
         if (refusal) {
             return [null, refusal];
         }
-        return [Anthros.tries(anthro, anthro, user.id, cubs, null), null];
+        return [Anthros.tries(anthro, anthro, user.id, cubs), null];
     }
 
     /**
      * Breeds the pair up to times times, stopping once the dam's litter is full. Returns { litter, barren,
      * attempts, took } (see breed()).
      */
-    private static tries(sire: Row, dam: Row, bredBy: number, times: number, cubsTo: number | null): BreedOutcome {
+    private static tries(sire: Row, dam: Row, bredBy: number, times: number): BreedOutcome {
         const result: BreedOutcome = { litter: null, barren: null, attempts: 0, took: 0 };
         for (let i = 0; i < times; i++) {
-            const outcome = Litters.attempt(sire, dam, bredBy, false, cubsTo);
+            const outcome = Litters.attempt(sire, dam, bredBy, false);
             result.attempts++;
             if (outcome.litter) {
                 result.took++;
@@ -1173,7 +1165,7 @@ export class Anthros {
     }
 
     /**
-     * Breeds a group of the user's anthros and employees times rounds. Each round, every anthro that can sire breeds
+     * Breeds a group of the user's anthros times rounds. Each round, every anthro that can sire breeds
      * once with a random anthro from the group that can be a dam (never itself). Pairs that break the rules are still
      * bred and recorded, but produce no litter. Returns { pairs: {"Sire × Dam": count}, litters: Map of dam id =>
      * litter, barren: {"Sire × Dam: reason": count}, skipped: [reason, ...] }.
@@ -1226,11 +1218,11 @@ export class Anthros {
 
     /**
      * Admin breeding that ignores ownership, fertility, auctions, and which day the dam's litter started. Other rules
-     * (gender roles, a full litter) still apply: the breeding is recorded but produces no litter. The cub goes to
-     * the anthro ownerId, or as a normal birth would when 0 (see Litters::deliverDue).
+     * (gender roles, a full litter) still apply: the breeding is recorded but produces no litter. The cubs belong to
+     * the dam's owner, as any cubs do (see Litters::deliverDue).
      * Returns [{ litter: ?Row, barren: ?string }, null] or [null, error message].
      */
-    static forceBreed(sireId: number, damId: number, ownerId: number, adminId: number): [Row | null, string | null] {
+    static forceBreed(sireId: number, damId: number, adminId: number): [Row | null, string | null] {
         const sire = Anthros.findAny(sireId);
         const dam = Anthros.findAny(damId);
         if (!sire || !dam) {
@@ -1244,10 +1236,7 @@ export class Anthros {
                 return [null, `${parent.name} has died.`];
             }
         }
-        if (ownerId !== 0 && !Anthros.findAny(ownerId)) {
-            return [null, 'Choose which anthro owns the offspring.'];
-        }
-        return [Litters.attempt(sire, dam, adminId, true, ownerId || null), null];
+        return [Litters.attempt(sire, dam, adminId, true), null];
     }
 
     /**

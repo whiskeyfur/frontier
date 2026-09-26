@@ -201,7 +201,7 @@ describe('Anthros', () => {
         anthro({ name: 'Slave', owner: alice, wage: 5 });
         expect(Anthros.employedBy(alice.id).map((a) => a.name)).toEqual(['Worker']);
         expect(Anthros.forHire().map((a) => a.name)).toEqual(['Seeker']);
-        expect(Anthros.findControlled(alice.id, worker.id)!.id).toBe(worker.id);
+        expect(Anthros.findControlled(alice.id, worker.id), 'Hired to work, not to be bred.').toBeNull();
         expect(Anthros.findControlled(alice.id, seeker.id)).toBeNull();
     });
 
@@ -334,20 +334,25 @@ describe('Anthros', () => {
         playerAnthro(alice);
         const mine = anthro({ owner: alice, gender: 'Male' });
         const theirs = anthro({ gender: 'Female' });
-        expect(Anthros.breed(alice.id, mine.id, theirs.id)).toEqual([null, 'Choose a sire and a dam from your anthros and employees.']);
+        expect(Anthros.breed(alice.id, mine.id, theirs.id)).toEqual([null, 'Choose a sire and a dam from your anthros.']);
         expect(Anthros.breed(alice.id, mine.id, mine.id)).toEqual([null, 'The sire and dam must be different anthros.']);
         const dam = anthro({ owner: alice, gender: 'Female', name: 'Listed' });
         Auctions.create(dam, alice.id, 5, null, 1);
         expect(Anthros.breed(alice.id, mine.id, dam.id)).toEqual([null, 'Listed is up for auction.']);
     });
 
-    test('employers can breed and own the cubs', () => {
+    test('employers can\'t breed their employees', () => {
         const alice = player('alice');
         const sire = anthro({ owner: alice, gender: 'Male' });
         const employee = anthro({ gender: 'Female', employer: alice });
-        const [outcome] = Anthros.breed(alice.id, sire.id, employee.id);
-        expect(outcome!.litter).not.toBeNull();
-        expect(Number(scalar('SELECT owner_id FROM game_breedings')), 'Cubs go to her anthro.').toBe(anthroOf(alice));
+        expect(Anthros.breed(alice.id, sire.id, employee.id)).toEqual([null, 'Choose a sire and a dam from your anthros.']);
+        expect(Anthros.mayBreed(alice, Anthros.findAny(employee.id)!)).toBe(false);
+        expect(Anthros.breedable(alice.id).map((a) => a.id)).not.toContain(employee.id);
+        // An employee's cubs are her own, however she's bred (she's free).
+        Litters.attempt(anthro({ gender: 'Male' }), employee, null, false);
+        db().run('UPDATE game_litters SET due_on = UTC_DATE()');
+        Litters.deliverDue();
+        expect(Number(scalar('SELECT owner_id FROM game_anthros WHERE dam_id = ?', [employee.id]))).toBe(employee.id);
     });
 
     test('group breed', () => {
@@ -382,14 +387,13 @@ describe('Anthros', () => {
         const alice = player('alice');
         const sire = anthro({ gender: 'Male', fertile_on: '2999-01-01' });
         const dam = anthro({ gender: 'Female', fertile_weekday: offDay() });
-        let [outcome, error] = Anthros.forceBreed(sire.id, dam.id, anthroOf(alice), boss.id);
+        let [outcome, error] = Anthros.forceBreed(sire.id, dam.id, boss.id);
         expect(error).toBeNull();
         expect(outcome!.litter).not.toBeNull();
-        [outcome] = Anthros.forceBreed(dam.id, sire.id, 0, boss.id);
+        [outcome] = Anthros.forceBreed(dam.id, sire.id, boss.id);
         expect(outcome!.litter).toBeNull();
-        expect(Anthros.forceBreed(999999, dam.id, 0, boss.id)).toEqual([null, 'Choose a sire and a dam.']);
-        expect(Anthros.forceBreed(sire.id, dam.id, 999999, boss.id)).toEqual([null, 'Choose which anthro owns the offspring.']);
-        expect(Anthros.forceBreed(sire.id, sire.id, 0, boss.id)).toEqual([null, 'The sire and dam must be different anthros.']);
+        expect(Anthros.forceBreed(999999, dam.id, boss.id)).toEqual([null, 'Choose a sire and a dam.']);
+        expect(Anthros.forceBreed(sire.id, sire.id, boss.id)).toEqual([null, 'The sire and dam must be different anthros.']);
     });
 
     test('can breed needs another anthro', () => {

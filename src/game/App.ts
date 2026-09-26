@@ -37,8 +37,9 @@ import * as market from './app/market';
 import * as social from './app/social';
 import * as schedules from './app/schedules';
 import * as land from './app/land';
-import { renderMarkdown } from '../site/markdown';
+import { Docs } from '../site/Docs';
 import changesMd from './views/changes.md?raw';
+import knowledgeBaseMd from './views/knowledge-base.md?raw';
 import assetsIndexView from './views/assets/index';
 import assetsWorkersView from './views/assets/workers';
 import assetsLandView from './views/assets/land';
@@ -50,6 +51,7 @@ import courtStructureView from './views/court-structure';
 import courtLandsView from './views/court-lands';
 import courtBaronyView from './views/court/barony';
 import changesView from './views/changes';
+import knowledgeBaseView from './views/knowledge-base';
 import financesReportView from './views/finances-report';
 import walletView from './views/wallet';
 import messageView from './views/message';
@@ -67,7 +69,7 @@ export class App {
         '/game/socials': 'Social',
         '/game/court': 'Court',
         '/game/wallet': 'Finances',
-        '/game/changes': 'Changes',
+        '/game/docs': 'Docs',
     };
 
     // Menu items that open a submenu: [path => label], the first usually the item's own page.
@@ -84,6 +86,7 @@ export class App {
         '/game/court': { '/game/court': 'Nobility', '/game/court/structure': 'Structure', '/game/court/lands': 'Lands', '/game/court/fiefs': 'Fiefs' },
         '/game/home': { '/game/home': 'Home', '/game/preferences': 'Preferences' },
         '/game/wallet': { '/game/wallet': 'Wallet', '/game/finances/report': 'Report' },
+        '/game/docs': { '/game/docs/knowledge-base': 'Knowledge Base', '/game/docs/changes': 'Changes' },
     };
 
     // Long lists (anthros to become, job seekers, wallets) show this many at a time, searchable by name.
@@ -103,6 +106,7 @@ export class App {
         '/game/admin/baronies': ['Baronies', 'Found, name and grant baronies and their towns, villages and expanses.'],
         '/game/admin/buildings': ['Buildings', 'The kinds of buildings anthros can build: days of work and acres of land.'],
         '/game/admin/goods': ['Goods', 'The goods the market trades, and what it charges and pays for them.'],
+        '/game/admin/recipes': ['Recipes', 'What each occupation makes, from what: producers, craftsmen and service jobs.'],
         '/game/admin/wallets': ['Wallets', 'Every anthro\'s coins; add or take away.'],
         '/game/admin/resets': ['Resets', 'Players asking to stop playing their anthro.'],
         '/game/admin/notifications': ['Notifications', 'Every notification and message, deleted ones included.'],
@@ -270,6 +274,7 @@ export class App {
                 case '/game/admin/baronies': admin.manageBaronies(this, user, post); break;
                 case '/game/admin/buildings': admin.manageBuildings(this, user, post); break;
                 case '/game/admin/goods': admin.manageGoods(this, user, post); break;
+                case '/game/admin/recipes': admin.manageRecipes(this, user, post); break;
                 case '/game/admin/wallets': admin.manageWallets(this, user, post); break;
                 case '/game/admin/resets': admin.manageResets(this, user, post); break;
                 case '/game/admin/notifications': admin.allNotifications(this, user, post); break;
@@ -432,10 +437,26 @@ export class App {
                 social.socials(this, user, post);
                 break;
 
+            case '/game/docs':
+                this.redirect('/game/docs/knowledge-base');
+
             case '/game/changes':
+                // Its old address.
+                this.redirect('/game/docs/changes');
+
+            case '/game/docs/changes':
                 // What's changed in the game, kept as Markdown in game/views/changes.md.
-                this.echo(this.render(changesView, user, { html: renderMarkdown(changesMd) }));
+                this.echo(this.render(changesView, user, {
+                    html: Docs.render(changesMd, user)[0],
+                }));
                 break;
+
+            case '/game/docs/knowledge-base': {
+                // How the game works, kept as Markdown in game/views/knowledge-base.md, with a contents list.
+                const [html, contents] = Docs.render(knowledgeBaseMd, user);
+                this.echo(this.render(knowledgeBaseView, user, { html, contents }));
+                break;
+            }
 
             case '/game/market/land':
                 market.land(this, user, post);

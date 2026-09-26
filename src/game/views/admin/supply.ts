@@ -51,7 +51,6 @@ export default function supply(v: ViewContext, { error, skills, post }: { error:
         <p class="text-body-secondary">
             Creates free, grown anthros looking for work on the <a href="/game/market/jobs">job market</a>, each practised
             at a trade (Novice to Journeyman), asking what their trade pays at their level, or a wage you choose.
-            Whether an employer may breed them is a term of the job; those who may be bred ask ${Jobs.BREEDABLE_EXTRA} more.
         </p>
         <form method="post" action="/game/admin/supply" class="card card-body">
             <input type="hidden" name="csrf" value="${v.csrf}">
@@ -67,14 +66,6 @@ export default function supply(v: ViewContext, { error, skills, post }: { error:
                         <option value="random">By their trade</option>
                         ${[...skills].map(([skillId, skillName]) => html`
                             <option value="${skillId}">${skillName}</option>`)}
-                    </select>
-                </div>
-                <div class="col-sm-6">
-                    <label class="form-label" for="worker-breedable">May be bred</label>
-                    <select class="form-select" id="worker-breedable" name="breedable">
-                        <option value="random">By their trade</option>
-                        <option value="1">Yes</option>
-                        <option value="0">No</option>
                     </select>
                 </div>
                 <div class="col-sm-6">

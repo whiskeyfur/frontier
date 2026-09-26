@@ -6,6 +6,7 @@ import type { Row } from '../db/Db';
 import { Anthros } from './Anthros';
 import { Buildings } from './Buildings';
 import { Clock } from './Clock';
+import { Crafts } from './Crafts';
 import { Goods } from './Goods';
 import { Land } from './Land';
 import { Market } from './Market';
@@ -383,8 +384,8 @@ export class Fiefs {
     }
 
     /**
-     * The tax day's collection from a vassal: what it owes, paid in coins, then food beyond RESERVE_DAYS' for its
-     * household, then lumber, each good at its value (see value). What's left owed stays owed (and it's overdue from today, if it
+     * The tax day's collection from a vassal: what it owes, paid in coins, then food (its edible goods) beyond
+     * RESERVE_DAYS' for its household, then its other goods, each good at its value (see value). What's left owed stays owed (and it's overdue from today, if it
      * wasn't already); paid in full, it isn't overdue.
      */
     private static collect(vassal: Row): void {
@@ -400,13 +401,18 @@ export class Fiefs {
             owed -= coins;
             paid.push(Wallets.format(coins));
         }
-        for (const good of ['food', 'lumber']) {
+        // Food (every edible good, cheapest first) beyond the household's reserve, then its other goods.
+        let reserve = Goods.household(vassal.id).length * Goods.FOOD_PER_DAY * Fiefs.RESERVE_DAYS;
+        const edibles = Goods.edibles();
+        for (const good of [...edibles, ...Object.keys(Market.goods()).filter((g) => !edibles.includes(g))]) {
             if (owed <= 0) {
                 break;
             }
             let spare = Goods.amount(vassal.id, good);
-            if (good === 'food') {
-                spare -= Goods.household(vassal.id).length * Goods.FOOD_PER_DAY * Fiefs.RESERVE_DAYS;
+            if (edibles.includes(good)) {
+                const kept = Math.min(spare, reserve);
+                reserve -= kept;
+                spare -= kept;
             }
             if (!Fiefs.value(good)) {
                 continue;
@@ -415,7 +421,7 @@ export class Fiefs {
             if (units > 0 && Goods.take(vassal.id, good, units)) {
                 Goods.add(lordId, good, units);
                 owed -= units * Fiefs.value(good);
-                paid.push(`${units} ${good}`);
+                paid.push(units + ' ' + Crafts.goodName(good));
             }
         }
         Fiefs.settleBalance(vassal.id, owed - float(vassal.tax_balance), true);

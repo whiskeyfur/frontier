@@ -2,16 +2,49 @@ Newest first. Add new entries at the top, under a dated heading.
 
 ## 2026-09-26
 
+### Work makes goods
+- **Occupations are producers, craftsmen or service jobs.** Producers make goods from their labour: a farmer grows
+  grain, hops, flax or vegetables (on at least 10 acres of its master's land), a miner digs iron ore, stone, clay or
+  gold, and so on. Craftsmen turn goods into goods: a miller makes flour from grain, a brewer ale from grain and hops.
+  Service jobs (a scribe, a priest, a soldier...) need no materials, make nothing, and are paid in coins as before.
+- **The goods are the pay:** producers and craftsmen earn no coins, but keep what they make, or sell it at the
+  market. A day makes 1, 2, 3 or 5 units by level. Materials come from the master's store; short of them, it makes
+  what they allow, or rests.
+- **Choose the recipe** when planning work ("Farmer: Hops"); otherwise it works the first.
+- **36 new goods** at the market, from grain to jewellery. **Vegetables, meat, fish, bread and hot meals feed
+  anthros** like food does: each eats one a day, the cheapest first.
+- Anthros that keep themselves buy their materials, sell what they make, and never take up a trade that needs land.
+- Taxes can be paid in any goods, after coins and spare food.
+- **Market → Goods** sorts by any column (click its heading) and filters (the box under each heading: type "food"
+  under Food for just the food goods).
+[[only: admin]]
+- **Admin → Recipes:** what each occupation makes, from what; and **Admin → Goods** marks which goods are food.
+[[/only]]
+
+### Deleting notifications
+- Deleting notifications now says what it does: they're gone from your list, but administrators can still review them.
+
+### Workers are hired to work
+- **Employers can no longer breed their employees,** or plan them to breed; the job market's "may be bred" terms are
+  gone, and so is the coin more that came with them. Wages are **1 to 15 coins a day** (a Master's pay). A free
+  employee's cubs are her own.
+
+### Fixes
+- **An anthro that dies while up for auction** ends its auction, and the highest bid now goes back to the bidder (it
+  was lost).
+- **An anthro's goods** (food, lumber) now go to its heir when it dies, with its coins.
+- **Clearing land** adds to its master's own land there, never to a fief held of a lord.
+- **An anthro's own pages** (its page, schedule and breeding), an auction, a barony and the game home now show their
+  section's bar under the menu, marking the page they belong to.
+
+### Docs
+- **Changes** has moved under a new **Docs** menu, beside a new **Knowledge Base**: how each of the game's systems
+  works, from time and schedules to land, titles and taxes.
+
 ### Page layout
 - A section's pages (Assets, Market, Court...) are now a **bar under the menu**, instead of tabs on the page. On a wide
   screen, the menu and that bar stay at the top as you scroll; on a phone the bar is hidden, and the menu (☰) lists
   the same pages.
-- Every page has a **footer** at the bottom of the window, with room above it at the end of the page.
-
-### The app menu
-- The navbar's **Home** is now a menu of the apps you can open, labelled with the one you're in: **Home** (the site),
-  **Frontier** (this game, for players) and **Gurps** (GURPS game files, for the gurps role). Frontier's own menu
-  (Assets, Market, Court...) shows while you're in Frontier.
 
 ### Maintenance
 - The game can be taken down for maintenance (updates are one such time). Every page then says so instead, and
@@ -60,26 +93,36 @@ Newest first. Add new entries at the top, under a dated heading.
 ### The goods market
 - **Market → Goods:** buy goods from the market, and sell them to it, at its prices. They go into, and come out of, your
   anthro's store.
+- A good never sells for more than it costs.
+[[only: admin]]
 - Admins manage the goods and their prices (**Admin → Goods**): what the market charges for each and what it pays, or
-  neither. A good never sells for more than it costs. Admins can add new goods.
+  neither. Admins can add new goods.
+[[/only]]
 - **Meals** bought when the food runs out cost food's market price, and a vassal's **taxes** value food and lumber at
   what the market pays for them (to start: food and lumber cost 5 coins and sell for 2).
 
+[[only: admin]]
 ### Admins speak for anthros nobody plays
 - On the admin Notifications page, admins can **send a message as an anthro nobody plays**, and messages to one have
   a **Reply as** button. Players see it from the anthro, like any message; only admins see who wrote it.
+[[/only]]
 
 ### Fixes
 - **Schedules are carried out once a day for the whole game,** with the rest of the day's business. A routine set up
   (or a day planned) after that starts tomorrow; before, it was carried out at once, so a new anthro could forage or
   work on the day it arrived.
+[[only: admin]]
 - **Advancing time** now moves the day of the week on too: each day advanced is the next weekday in the game. Before,
   every advanced day ran as the real day of the week, so a routine's plan for that one weekday (a Saturday of
   breeding, say) was carried out every day advanced, as were dams' conceiving days and the Monday tax day.
+[[/only]]
 - A weekly routine (an anthro's, or a standard schedule's) that can't be saved keeps everything entered, with the day
   in error marked, instead of going back to the saved routine. Planning a day keeps its choice too.
-- An anthro's page offers **Schedule** only to whoever plays, owns or employs it. Admins schedule any other anthro from
-  the admin panel ("Schedule (admin)"). A standard schedule applies only while its player plans the anthro as a player.
+- An anthro's page offers **Schedule** only to whoever plays, owns or employs it. A standard schedule applies only
+  while its player plans the anthro as a player.
+[[only: admin]]
+- Admins schedule any other anthro from the admin panel ("Schedule (admin)").
+[[/only]]
 - An **Invite** to a closed breeding group shows as unavailable, with a link to open the group to invites, instead of
   not showing at all.
 
@@ -118,8 +161,10 @@ Newest first. Add new entries at the top, under a dated heading.
   no floor under it.
 - **A reset always leaves at least one barony.** If no court is seated, there's an empty one, held by no one: three
   villages, a town and an expanse nobody manages, and 10,000 to 15,000 acres of the land office's land.
+[[only: admin]]
 - **Admins choose the new game's court** when resetting: how many of each rank, from none at all (an empty game) to a
   full court, whether the monarch has a consort, and whether they get baronies, settlements and commoners.
+[[/only]]
 
 ### Marriage
 - **Households:** a household has one head and any number of spouses, who share the head's rank as consorts: a

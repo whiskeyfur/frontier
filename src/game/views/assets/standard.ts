@@ -6,6 +6,7 @@ import type { Row } from '../../../db/Db';
 import { Anthros } from '../../Anthros';
 import { Schedules, type PlanOptions } from '../../Schedules';
 import gameLayout from '../layouts/game';
+import subnav from '../subnav';
 import planFields from './plan-fields';
 import planScript from './plan-script';
 
@@ -16,6 +17,7 @@ export default function standard(v: ViewContext, { standard, options, error, err
     return gameLayout(v, {
         title: standard.name + ' - Schedules - Game',
         content: html`
+    ${subnav(v, { section: '/game/assets' })}
     <p><a href="/game/assets/schedules">&larr; Schedules</a></p>
     <h1 class="h3 mb-1">${standard.name}</h1>
     <p class="text-body-secondary">

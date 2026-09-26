@@ -14,20 +14,17 @@ import { Wallets } from './Wallets';
 /**
  * Employment. A free anthro can't be bought; a player who wants one hires it on the job market for its asking daily
  * wage (WAGE_MIN to WAGE_MAX coins): the anthro they play becomes its employer and pays the wages from its wallet.
- * What an employee's work makes goes to its employer. Whether the employer may breed it is a term of the job
- * (hire_breedable); those who agree ask a coin more. Unplayed free anthros ask what their best skill pays (see
- * expectedWage); players choose theirs,
+ * What an employee's work makes goes to its employer; an employee is hired to work, and its employer can't breed it.
+ * Unplayed free anthros ask what their best skill pays (see expectedWage); players choose theirs,
  * or aren't looking for work; admins can supply workers with a trade (see supply). Wages are paid for each day in advance (the first when hired), by payDue() on each request; a
  * job ends when the employer can't pay, dismisses the employee, the employee quits, or loses its freedom.
  */
 export class Jobs {
-    // How much more a worker who may be bred asks, and the most workers supplied at once.
-    static readonly BREEDABLE_EXTRA = 1;
     static readonly WAGE_MIN = 1;
-    // The most a worker asks: a Master's pay (see Schedules::PAY), and a coin more if it may be bred. (A getter: it
-    // reads another class's constant, which may not be loaded yet when this one is.)
+    // The most a worker asks: a Master's pay (see Schedules::PAY). And the most workers supplied at once. (WAGE_MAX is
+    // a getter: it reads another class's constant, which may not be loaded yet when this one is.)
     static get WAGE_MAX(): number {
-        return Schedules.PAY['Master'] + Jobs.BREEDABLE_EXTRA;
+        return Schedules.PAY['Master'];
     }
     static readonly MAX_SUPPLY = 50;
     // A supplied worker's practice at its trade, in days (Novice to Journeyman: see Schedules::LEVELS).
@@ -35,19 +32,19 @@ export class Jobs {
 
     /**
      * What a worker can expect to ask a day for work at level (see Schedules::level; null: no skill learned): what
-     * that work pays (Schedules::PAY; WAGE_MIN for unskilled work), and BREEDABLE_EXTRA more if it may be bred.
+     * that work pays (Schedules::PAY; WAGE_MIN for unskilled work).
      */
-    static expectedWage(level: string | null, breedable: boolean): number {
+    static expectedWage(level: string | null): number {
         const pay = level === null ? Jobs.WAGE_MIN : (Schedules.PAY[level] ?? Jobs.WAGE_MIN);
-        return Math.max(Jobs.WAGE_MIN, Math.min(Jobs.WAGE_MAX, pay + (breedable ? Jobs.BREEDABLE_EXTRA : 0)));
+        return Math.max(Jobs.WAGE_MIN, Math.min(Jobs.WAGE_MAX, pay));
     }
 
     /**
      * What the anthro can expect to ask (see expectedWage), by the skill it's practised most.
      */
-    static skillWage(anthroId: number, breedable: boolean): number {
+    static skillWage(anthroId: number): number {
         const practice = Auth.db().value('SELECT MAX(practice) FROM game_anthro_skills WHERE anthro_id = ? AND practice >= ?', [anthroId, Schedules.WORK_MIN_PRACTICE]);
-        return Jobs.expectedWage(practice ? Schedules.level(int(practice)) : null, breedable);
+        return Jobs.expectedWage(practice ? Schedules.level(int(practice)) : null);
     }
 
     /**
@@ -57,19 +54,19 @@ export class Jobs {
     static assignWages(): void {
         const db = Auth.db();
         for (const row of db.all(
-            'SELECT id, hire_breedable FROM game_anthros WHERE wage IS NULL AND owner_id = id AND player_id IS NULL AND title_rank IS NULL AND died_at IS NULL',
+            'SELECT id FROM game_anthros WHERE wage IS NULL AND owner_id = id AND player_id IS NULL AND title_rank IS NULL AND died_at IS NULL',
         )) {
-            db.run('UPDATE game_anthros SET wage = ? WHERE id = ?', [Jobs.skillWage(int(row.id), !!row.hire_breedable), row.id]);
+            db.run('UPDATE game_anthros SET wage = ? WHERE id = ?', [Jobs.skillWage(int(row.id)), row.id]);
         }
     }
 
     /**
      * Admin: count new free, grown anthros looking for work: random gender, species and name, each practised at a
-     * trade (the skill skillId, or a random one; SUPPLY_PRACTICE days of it), on terms that let an employer breed them
-     * (breedable, or at random), asking wage a day (or what its trade pays: see expectedWage).
+     * trade (the skill skillId, or a random one; SUPPLY_PRACTICE days of it), asking wage a day (or what its trade
+     * pays: see expectedWage).
      * Returns [how many, null] or [null, error message].
      */
-    static supply(count: number, skillId: number | null, breedable: boolean | null, wage: number | null): [number | null, string | null] {
+    static supply(count: number, skillId: number | null, wage: number | null): [number | null, string | null] {
         const skills = Schedules.skills();
         const species = Auth.db().column('SELECT id FROM game_species');
         if (count < 1 || count > Jobs.MAX_SUPPLY) {
@@ -85,16 +82,15 @@ export class Jobs {
             return [null, 'The game needs species and skills first.'];
         }
         const db = Auth.db();
-        const insert = 'INSERT INTO game_anthros (name, gender_id, species_id, birthdate, fertile_on, wage, hire_breedable) VALUES (?, ?, ?, ?, ?, ?, ?)';
+        const insert = 'INSERT INTO game_anthros (name, gender_id, species_id, birthdate, fertile_on, wage) VALUES (?, ?, ?, ?, ?, ?)';
         const practice = 'INSERT INTO game_anthro_skills (anthro_id, skill_id, practice) VALUES (?, ?, ?)';
         for (let i = 0; i < count; i++) {
-            const mayBreed = breedable ?? !!random_int(0, 1);
             const genderId = Genders.randomBirthId();
             const birthdate = Anthros.randomAdultBirthdate();
             const days = random_int(Jobs.SUPPLY_PRACTICE[0], Jobs.SUPPLY_PRACTICE[1]);
             db.run(insert, [
                 Names.random(0, Genders.find(genderId)!.presents_as), genderId, species[array_rand(species)],
-                birthdate, Anthros.randomFertileOn(birthdate), wage ?? Jobs.expectedWage(Schedules.level(days), mayBreed), int(mayBreed),
+                birthdate, Anthros.randomFertileOn(birthdate), wage ?? Jobs.expectedWage(Schedules.level(days)),
             ]);
             const id = db.lastInsertId();
             Anthros.free(id);
@@ -200,10 +196,10 @@ export class Jobs {
     }
 
     /**
-     * The player sets the daily wage they'd work for, or stops looking for work ('' ), and whether an employer may breed
-     * them. Returns an error message, or null.
+     * The player sets the daily wage they'd work for, or stops looking for work (''), and the work they offer. Returns an
+     * error message, or null.
      */
-    static setAsking(user: User, wage: string, breedable = true, occupationId: number | null = null): string | null {
+    static setAsking(user: User, wage: string, occupationId: number | null = null): string | null {
         const anthro = Anthros.player(user.id);
         if (!anthro) {
             return "You don't play an anthro.";
@@ -215,8 +211,8 @@ export class Jobs {
         if (occupationId !== null && !Jobs.offerable(anthro).has(occupationId)) {
             return 'Choose work you\'ve learned the skill for (train at it first).';
         }
-        Auth.db().run('UPDATE game_anthros SET wage = ?, hire_breedable = ?, seeking_occupation_id = ? WHERE id = ?',
-            [wage === '' ? null : int(wage), int(breedable), occupationId, anthro.id]);
+        Auth.db().run('UPDATE game_anthros SET wage = ?, seeking_occupation_id = ? WHERE id = ?',
+            [wage === '' ? null : int(wage), occupationId, anthro.id]);
         return null;
     }
 
@@ -234,7 +230,7 @@ export class Jobs {
         for (const [id, occupation] of Schedules.occupations(Preferences.era(anthro.player_id))) {
             if (practice.has(occupation.skill_id)) {
                 const level = Schedules.level(int(practice.get(occupation.skill_id)));
-                offer.push([id, { ...occupation, level, practice: int(practice.get(occupation.skill_id)), wage: Jobs.expectedWage(level, false) }]);
+                offer.push([id, { ...occupation, level, practice: int(practice.get(occupation.skill_id)), wage: Jobs.expectedWage(level) }]);
             }
         }
         offer.sort(([, a], [, b]) => spaceship(b.practice, a.practice) || spaceship(a.title, b.title));
@@ -268,8 +264,9 @@ export class Jobs {
     }
 
     /**
-     * Pays every day's wages that have come due since each job was last paid. A job whose employer can't pay (or no
-     * longer plays an anthro) ends. The game runs this on each request. Returns how many days were paid.
+     * Pays every day's wages that have come due since each job was last paid. A job whose employer can't pay ends
+     * (one whose employer nobody plays any more goes on, while it can pay). The game runs this on each request.
+     * Returns how many days were paid.
      */
     static payDue(): number {
         Jobs.assignWages();

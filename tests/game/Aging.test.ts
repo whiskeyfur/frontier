@@ -4,6 +4,8 @@ import { gmdate, range, strtotimeOrThrow } from '../../src/core/php';
 import type { Row } from '../../src/db/Db';
 import { Aging } from '../../src/game/Aging';
 import { Anthros } from '../../src/game/Anthros';
+import { Auctions } from '../../src/game/Auctions';
+import { Goods } from '../../src/game/Goods';
 import { Groups } from '../../src/game/Groups';
 import { Land } from '../../src/game/Land';
 import { Notifications } from '../../src/game/Notifications';
@@ -60,7 +62,8 @@ describe('Aging', () => {
         playerAnthro(alice);
         expect(Socials.flirt(alice, dead.id, '')).toEqual([null, 'Gone has died.']);
         expect(Anthros.breedingBlocker(dead, 'sire', true)).toBe('died');
-        expect(Anthros.forceBreed(dead.id, anthro({ gender: 'Female' }).id, 0, 1)).toEqual([null, 'Gone has died.']);
+        // (Upstream still passes forceBreed a fourth argument, 1, from before it lost its owner parameter; PHP ignores it.)
+        expect(Anthros.forceBreed(dead.id, anthro({ gender: 'Female' }).id, 0)).toEqual([null, 'Gone has died.']);
         expect(Anthros.transfer(anthro({ owner: alice }), dead.id, alice.id)).toBe("The dead can't own or be owned.");
     });
 
@@ -82,7 +85,26 @@ describe('Aging', () => {
         Aging.buryDue();
         expect(coins(owner.id)).toBe(30);
         expect(coins(slave.id)).toBe(0);
-        expect(notificationsFor(owner.id)).toContain('Serf died of old age, aged 60 weeks. You inherited their 30 ' + Wallets.CURRENCY + '.');
+        // Its goods too (every anthro starts with a week's food).
+        expect(Goods.amount(owner.id)).toBe(14);
+        expect(Goods.amount(slave.id)).toBe(0);
+        expect(notificationsFor(owner.id)).toContain('Serf died of old age, aged 60 weeks. You inherited their 30 ' + Wallets.CURRENCY + ', 7 food.');
+    });
+
+    test('an auction ends with its bid returned', () => {
+        const alice = player('alice');
+        playerAnthro(alice);
+        const bob = player('bobby');
+        const bidder = playerAnthro(bob);
+        setCoins(bidder.id, 50);
+        const lot = dueToDie({ owner: alice, name: 'Lot' });
+        const [auctionId] = Auctions.create(lot, alice.id, 10, null, 3);
+        expect(Auctions.bid(auctionId!, bob, 12)).toBeNull();
+        expect(coins(bidder.id), 'The bid is taken when it\'s made.').toBe(38);
+        Aging.buryDue();
+        expect(scalar('SELECT status FROM game_auctions WHERE id = ?', [auctionId])).toBe('cancelled');
+        expect(coins(bidder.id), 'And comes back when the anthro dies.').toBe(50);
+        expect(notificationsFor(bidder.id)).toContain('Lot died before the auction ended; your 12 ' + Wallets.CURRENCY + ' came back.');
     });
 
     test('a free anthro\'s estate goes to its eldest living free child', () => {
@@ -124,7 +146,8 @@ describe('Aging', () => {
         const alice = player('alice');
         const boss = playerAnthro(alice);
         const worker = dueToDie({ employer: alice, employed_wage: 5, employed_since: gmdate('Y-m-d H:i:s'), paid_until: gmdate('Y-m-d') });
-        const [groupId] = Groups.create(alice, 'Nest', [anthro({ owner: alice }).id, worker.id]);
+        const [groupId] = Groups.create(alice, 'Nest', [anthro({ owner: alice }).id]);
+        db().run('INSERT INTO game_group_members (group_id, anthro_id) VALUES (?, ?)', [groupId, worker.id]);
         const dam = dueToDie({ gender: 'Female', name: 'Mama', player_id: player('bobby').id }); // played: answers later
         db().run('INSERT INTO game_litters (dam_id, bred_on, due_on) VALUES (?, UTC_DATE(), ADDDATE(UTC_DATE(), 5))', [dam.id]);
         Socials.flirt(alice, dam.id, 'hi');

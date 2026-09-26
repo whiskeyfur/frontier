@@ -1,6 +1,6 @@
 // Upstream: game/views/index.blade.php
 import { Auth } from '../../core/Auth';
-import { checked, disabled, html, selected, type Html } from '../../core/html';
+import { disabled, html, selected, type Html } from '../../core/html';
 import type { InputArray } from '../../core/http';
 import { int, json_encode, number_format } from '../../core/php';
 import type { ViewContext } from '../../core/View';
@@ -17,6 +17,7 @@ import nameInput from './assets/name-input';
 import selfBreedForm from './assets/forms/self-breed';
 import details, { type HomeForm } from './home/details';
 import gameLayout from './layouts/game';
+import subnav from './subnav';
 import listSearch from './list-search';
 
 export type IndexData = {
@@ -34,6 +35,7 @@ export default function index(v: ViewContext, data: IndexData): Html {
     return gameLayout(v, {
         title: 'Game',
         content: html`
+    ${subnav(v, { section: '/game/home' })}
     <h1 class="h3 mb-3">Welcome, ${user.username}</h1>
     <div class="row g-3">
         <div class="col-md-7">
@@ -88,7 +90,7 @@ export default function index(v: ViewContext, data: IndexData): Html {
                     ${player ? html`
                         <div class="d-flex flex-wrap gap-2">
                             <a class="btn btn-outline-secondary" href="/game/wallet">Wallet: ${Wallets.format(balance!)}</a>
-                            <a class="btn btn-outline-secondary" href="/game/assets/goods">Food: ${number_format(Goods.amount(Goods.keeperOf(player) ?? player.id))}${Goods.isHungry(player) ? html` <span class="badge text-bg-warning">hungry</span>` : ''}</a>
+                            <a class="btn btn-outline-secondary" href="/game/assets/goods">Food: ${number_format(Goods.food(Goods.keeperOf(player) ?? player.id))}${Goods.isHungry(player) ? html` <span class="badge text-bg-warning">hungry</span>` : ''}</a>
                             <a class="btn btn-outline-secondary" href="/game/assets/land">Land: ${Land.acres(land)}</a>
                             ${canBreed ? html`
                                 <a class="btn btn-success" href="/game/assets/${player.id}/breed">Breed</a>` : ''}
@@ -120,7 +122,6 @@ export default function index(v: ViewContext, data: IndexData): Html {
                                 <span>
                                     You work for <strong>${player.employer_name}</strong> at
                                     ${Wallets.format(int(player.employed_wage))} a day (paid through ${player.paid_until}).
-                                    Your employer can breed you.
                                 </span>
                                 <form method="post" action="/game/home" class="m-0">
                                     <input type="hidden" name="csrf" value="${v.csrf}">
@@ -142,25 +143,20 @@ export default function index(v: ViewContext, data: IndexData): Html {
                                         <option value="">Any work</option>
                                         ${[...offerable].map(([occupationId, occupation]) => html`
                                             <option value="${occupationId}" ${selected(player.seeking_occupation_id === occupationId)}>
-                                                ${occupation.title} (${occupation.skill}: ${occupation.level}): about ${occupation.wage},
-                                                or ${occupation.wage + Jobs.BREEDABLE_EXTRA} if you may be bred
+                                                ${occupation.title} (${occupation.skill}: ${occupation.level}): about ${occupation.wage}
                                             </option>`)}
                                     </select>
-                                    <div class="form-check align-self-center m-0">
-                                        <input class="form-check-input" type="checkbox" name="hire_breedable" value="1" id="hire_breedable" ${checked(player.hire_breedable)}>
-                                        <label class="form-check-label small" for="hire_breedable">My employer may breed me</label>
-                                    </div>
                                     <button class="btn btn-outline-primary btn-sm">Save</button>
                                 </div>
                                 <div class="form-text">
                                     ${Jobs.WAGE_MIN} to ${Jobs.WAGE_MAX} coins a day; leave it empty if you're not looking.
-                                    What you make at work goes to your employer. Workers who may be bred can ask more.
+                                    What you make at work goes to your employer, who can't breed you.
                                     ${Goods.mealPrice() ? html`
                                         Food costs ${Wallets.format(Goods.mealPrice()!)} a unit at the <a href="/game/market/goods">market</a>.` : ''}
                                     ${!offerable.size ? html`
                                         You haven't learned a skill to offer yet: <a href="/game/assets/${player.id}/schedule">train at one</a> first.` : html`
                                         Offer work you've learned; hired for it, you start on it every day. What each pays, by your level,
-                                        is what you can expect to ask (${Jobs.BREEDABLE_EXTRA} more if you may be bred).`}
+                                        is what you can expect to ask.`}
                                 </div>
                             </form>` : ''}
                         <details class="mt-3">

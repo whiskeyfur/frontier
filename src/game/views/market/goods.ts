@@ -12,6 +12,7 @@ import subnav from '../subnav';
 export default function goods(v: ViewContext, { player, error, balance, goods }: {
     player: Row | null; error: string | null; balance: number | null; goods: Record<string, Row>;
 }): Html {
+    const edibles = Goods.edibles();
     return gameLayout(v, {
         title: 'Goods - Game',
         content: html`
@@ -34,17 +35,21 @@ export default function goods(v: ViewContext, { player, error, balance, goods }:
         <form method="post" action="/game/market/goods">
             <input type="hidden" name="csrf" value="${v.csrf}">
             <div class="table-responsive">
-                <table class="table table-striped align-middle w-auto">
+                ${/* Sortable, with a filter under each heading (see js/tables.js). */ ''}
+                <table data-sortable class="table table-striped align-middle w-auto">
                     <thead>
-                    <tr><th>Good</th><th class="text-end">You have</th><th class="text-end">Buy for</th><th class="text-end">Sell for</th><th>How many</th><th></th></tr>
+                    <tr><th>Good</th><th>Food</th><th class="text-end">You have</th><th class="text-end">Buy for</th><th class="text-end">Sell for</th><th data-nosort>How many</th><th data-nosort></th></tr>
                     </thead>
                     <tbody>
-                    ${Object.values(goods).map((good) => html`
+                    ${Object.values(goods).map((good) => {
+                        const have = Goods.amount(player.id, good.good);
+                        return html`
                         <tr>
                             <td>${good.name}</td>
-                            <td class="text-end">${number_format(Goods.amount(player.id, good.good))}</td>
-                            <td class="text-end">${good.buy_price !== null ? Wallets.format(int(good.buy_price)) : '—'}</td>
-                            <td class="text-end">${good.sell_price !== null ? Wallets.format(int(good.sell_price)) : '—'}</td>
+                            <td>${edibles.includes(good.good) ? 'food' : ''}</td>
+                            <td class="text-end" data-sort="${have}">${number_format(have)}</td>
+                            <td class="text-end" data-sort="${good.buy_price ?? ''}">${good.buy_price !== null ? Wallets.format(int(good.buy_price)) : '—'}</td>
+                            <td class="text-end" data-sort="${good.sell_price ?? ''}">${good.sell_price !== null ? Wallets.format(int(good.sell_price)) : '—'}</td>
                             <td>
                                 <input class="form-control form-control-sm" style="width: 6rem" name="quantity[${good.good}]" type="number" min="1"
                                        max="${Market.MAX_QUANTITY}" value="1" aria-label="How many ${String(good.name).toLowerCase()}">
@@ -56,7 +61,8 @@ export default function goods(v: ViewContext, { player, error, balance, goods }:
                                 ${good.sell_price !== null ? html`
                                     <button class="btn btn-sm btn-outline-secondary" name="trade" value="sell:${good.good}">Sell</button>` : ''}
                             </td>
-                        </tr>`)}
+                        </tr>`;
+                    })}
                     </tbody>
                 </table>
             </div>

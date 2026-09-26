@@ -8,11 +8,13 @@ import { Land } from '../../Land';
 import { Ranks } from '../../Ranks';
 import { Wallets } from '../../Wallets';
 import gameLayout from '../layouts/game';
+import subnav from '../subnav';
 
 export default function barony(v: ViewContext, { barony }: { barony: Row }): Html {
     return gameLayout(v, {
         title: 'Barony of ' + barony.name + ' - Game',
         content: html`
+    ${subnav(v, { section: '/game/court' })}
     <p><a href="/game/court/lands">&larr; Lands</a></p>
     <h1 class="h3 mb-1">Barony of ${barony.name}</h1>
     <p class="text-body-secondary">

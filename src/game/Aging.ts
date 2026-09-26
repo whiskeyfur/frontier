@@ -3,6 +3,8 @@ import { Auth } from '../core/Auth';
 import { int } from '../core/php';
 import type { Row } from '../db/Db';
 import { Anthros } from './Anthros';
+import { Auctions } from './Auctions';
+import { Goods } from './Goods';
 import { Groups } from './Groups';
 import { Jobs } from './Jobs';
 import { Land } from './Land';
@@ -15,7 +17,7 @@ import { Wallets } from './Wallets';
  * never see. On the day it reaches that age it dies of old age. Anthros with no birthdate don't age.
  *
  * A dead anthro stays in the game (its family and history still show) but owns itself and holds nothing: its coins,
- * land and anthros go to its heir (see heir), a hereditary title passes on (see Ranks::strip), its job ends, it leaves
+ * goods, land and anthros go to its heir (see heir), a hereditary title passes on (see Ranks::strip), its job ends, it leaves
  * its breeding groups, an unborn litter is lost, and its player is released to create or become another anthro.
  */
 export class Aging {
@@ -80,8 +82,19 @@ export class Aging {
             const age = Anthros.age(anthro.birthdate);
             const name = anthro.name;
 
-            // Off the market: an open auction of it ends (bids are only held, so nothing is owed).
-            db.run("UPDATE game_auctions SET status = 'cancelled', closed_at = UTC_TIMESTAMP() WHERE anthro_id = ? AND status = 'open'", [anthro.id]);
+            // Off the market: an open auction of it ends, and the highest bid (taken when it was made) goes back.
+            const open = db.column("SELECT id FROM game_auctions WHERE anthro_id = ? AND status = 'open'", [anthro.id]);
+            for (const auctionId of open) {
+                const auction = Auctions.find(int(auctionId));
+                db.run("UPDATE game_auctions SET status = 'cancelled', closed_at = UTC_TIMESTAMP() WHERE id = ?", [auctionId]);
+                if (auction && auction.current_bidder_anthro_id !== null) {
+                    Wallets.change(int(auction.current_bidder_anthro_id), int(auction.current_bid),
+                        `${name} died: bid returned`, int(auctionId));
+                    Notifications.toAnthro(int(auction.current_bidder_anthro_id),
+                        `${name} died before the auction ended; your ` + Wallets.format(int(auction.current_bid)) + ' came back.',
+                        '/game/market/auctions/' + auctionId);
+                }
+            }
 
             const heir = Aging.heir(anthro);
             Ranks.strip(anthro, 'died');
@@ -98,6 +111,16 @@ export class Aging {
                     Wallets.change(heir.id, coins, `Inherited from ${name}`);
                 }
             }
+            // Its goods go to its heir's store too (or with no heir, nowhere).
+            const goods = db.pairs('SELECT good, quantity FROM game_goods WHERE anthro_id = ? AND quantity > 0', [anthro.id]);
+            const inherited: string[] = [];
+            for (const [good, quantity] of goods) {
+                if (heir) {
+                    Goods.add(heir.id, String(good), int(quantity));
+                    inherited.push(quantity + ' ' + good);
+                }
+            }
+            db.run('UPDATE game_goods SET quantity = 0 WHERE anthro_id = ?', [anthro.id]);
             Groups.bury(anthro);
             const lostLitter = db.run('DELETE FROM game_litters WHERE dam_id = ? AND born_at IS NULL', [anthro.id]);
             db.run(
@@ -123,7 +146,8 @@ export class Aging {
                 Notifications.toUser(int(anthro.player_id), `${news} You can create or become another anthro.`, '/game/home');
             }
             if (heir) {
-                const inherits = coins > 0 ? ' You inherited their ' + Wallets.format(coins) + '.' : '';
+                const things = [...(coins > 0 ? [Wallets.format(coins)] : []), ...inherited];
+                const inherits = things.length ? ' You inherited their ' + things.join(', ') + '.' : '';
                 Notifications.toAnthro(heir.id, news + inherits, '/game/assets/' + anthro.id);
             }
             db.commit();

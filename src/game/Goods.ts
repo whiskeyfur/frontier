@@ -1,7 +1,7 @@
 // Upstream: game/src/Goods.php
 import { Auth } from '../core/Auth';
 import { onReset } from '../core/caches';
-import { array_chunk, array_fill, gmdate, int, intdiv } from '../core/php';
+import { array_chunk, array_fill, empty, gmdate, int, intdiv, spaceship } from '../core/php';
 import type { Row } from '../db/Db';
 import { Market } from './Market';
 import { Wallets } from './Wallets';
@@ -13,14 +13,15 @@ import { Wallets } from './Wallets';
 export type Meals = { eaten: Map<number, number>; bought: Map<number, number>; hungry: number[] };
 
 /**
- * Goods an anthro has in store (game_goods): food (from foraging, eaten every day) and lumber (from clearing land,
- * used by building). What an anthro's work makes goes to whoever it works for (see Schedules::masterOf); what it
- * needs comes from whoever keeps it (see keeperOf): its owner (a free anthro keeps itself; an employer doesn't feed its
- * employees).
+ * Goods an anthro has in store (game_goods): food (from foraging), lumber (from clearing land, used by building), and
+ * whatever work makes (see Crafts). What an anthro's work makes goes to whoever it works for (see
+ * Schedules::masterOf); what it needs comes from whoever keeps it (see keeperOf): its owner (a free anthro keeps
+ * itself; an employer doesn't feed its employees).
  *
- * Every day each living anthro eats FOOD_PER_DAY food from its keeper's store (see feedToday). A keeper out of food
- * buys meals from the market at food's price there (see mealPrice), while its coins last; one that gets no meal goes
- * hungry that day, and can only rest or forage (see isHungry).
+ * Every day each living anthro eats FOOD_PER_DAY from its keeper's store (see feedToday): any edible good (food,
+ * bread, meat and the like: see edibles), the cheapest first. A keeper out of them buys meals from the market at food's
+ * price there (see mealPrice), while its coins last; one that gets no meal goes hungry that day, and can only rest or
+ * forage (see isHungry).
  */
 export class Goods {
     static readonly FOOD_PER_DAY = 1;
@@ -51,6 +52,43 @@ export class Goods {
      */
     static amount(anthroId: number, good = 'food'): number {
         return int(Auth.db().value('SELECT quantity FROM game_goods WHERE anthro_id = ? AND good = ?', [anthroId, good]));
+    }
+
+    /**
+     * The goods that feed anthros (Market's edible ones), cheapest first (by what the market pays): [key, ...].
+     */
+    static edibles(): string[] {
+        const edible = Object.entries(Market.goods()).filter(([, g]) => !empty(g.edible));
+        edible.sort(([, a], [, b]) => spaceship(int(a.sell_price ?? 0), int(b.sell_price ?? 0)) || spaceship(int(a.sort_order), int(b.sort_order)));
+        const keys = edible.map(([key]) => key);
+        return keys.length ? keys : ['food'];
+    }
+
+    /**
+     * How much the anthro has in store that anthros can eat (every edible good: see edibles).
+     */
+    static food(anthroId: number): number {
+        const edibles = Goods.edibles();
+        return int(Auth.db().value('SELECT COALESCE(SUM(quantity), 0) FROM game_goods WHERE anthro_id = ? AND good IN ('
+            + array_fill(edibles.length, '?').join(', ') + ')', [anthroId, ...edibles]));
+    }
+
+    /**
+     * Takes units of food from the anthro's store: the edible goods, cheapest first (see edibles). Returns how many it
+     * took (fewer if it ran out).
+     */
+    static eat(anthroId: number, units: number): number {
+        let eaten = 0;
+        for (const good of Goods.edibles()) {
+            if (eaten >= units) {
+                break;
+            }
+            const take = Math.min(units - eaten, Goods.amount(anthroId, good));
+            if (take > 0 && Goods.take(anthroId, good, take)) {
+                eaten += take;
+            }
+        }
+        return eaten;
     }
 
     static add(anthroId: number, good: string, quantity: number): void {
@@ -107,8 +145,8 @@ export class Goods {
     }
 
     /**
-     * Feeds every living anthro today, once a day (the game runs this on each request): each eats FOOD_PER_DAY from its
-     * keeper's store (see household), the keeper first and then the rest by who came first. When the store runs out
+     * Feeds every living anthro today, once a day (the game runs this on each request): each eats FOOD_PER_DAY of the
+     * edible goods (see eat) in its keeper's store (see household), the keeper first and then the rest by who came first. When the store runs out
      * the keeper buys meals at the market (see mealPrice) while its coins last; whoever's left goes hungry. Returns how many went
      * hungry.
      */
@@ -130,14 +168,9 @@ export class Goods {
             if (!households.has(ownerId)) households.set(ownerId, []);
             households.get(ownerId)!.push(int(row.id));
         }
-        const food = db.pairs("SELECT anthro_id, quantity FROM game_goods WHERE good = 'food'");
         const hungry: number[] = [];
-        const eat = "UPDATE game_goods SET quantity = quantity - ? WHERE anthro_id = ? AND good = 'food'";
         for (const [keeperId, members] of households) {
-            const fed = Math.min(members.length, intdiv(Math.max(0, int(food.get(keeperId) ?? 0)), Goods.FOOD_PER_DAY));
-            if (fed) {
-                db.run(eat, [fed * Goods.FOOD_PER_DAY, keeperId]);
-            }
+            const fed = intdiv(Goods.eat(keeperId, members.length * Goods.FOOD_PER_DAY), Goods.FOOD_PER_DAY);
             Goods.mealsToday.eaten.set(keeperId, fed * Goods.FOOD_PER_DAY);
             // Out of food: buy meals at the market, while the coins last.
             const short = members.length - fed;

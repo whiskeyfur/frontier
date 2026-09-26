@@ -9,7 +9,7 @@ This is a browser port of the game Frontier from [whiskeyfur/jcw-website](https:
 
 ## Synced commit
 
-Ported from upstream `dev` at **f2b89b0c06ee211c118b6ea7321e2b985dacea1b** (Frontier's section tabs become a second navigation bar under the header, 2026-09-26).
+Ported from upstream `dev` at **e5cd15c9ee00f0435896a81fc13ec1e7c0cfedf9** (Docs and privacy, account deletion, work that makes goods, 2026-09-26).
 
 ## Syncing an upstream change
 

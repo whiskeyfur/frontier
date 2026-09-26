@@ -62,11 +62,11 @@ describe('Jobs', () => {
         const alice = player('alice');
         expect(Jobs.setAsking(alice, '10')).toBe("You don't play an anthro.");
         const a = playerAnthro(alice);
-        expect(Jobs.setAsking(alice, 'x')).toBe('The wage must be 1 to 16 coins a day, or empty if you are not looking for work.');
-        expect(Jobs.setAsking(alice, '0')!.startsWith('The wage must be 1 to 16')).toBe(true);
-        expect(Jobs.setAsking(alice, '17')!.startsWith('The wage must be 1 to 16'), 'A Master\'s pay and a coin more, at most.').toBe(true);
-        expect(Jobs.setAsking(alice, ' 4 ', false)).toBeNull();
-        expect([Number(refresh(a).wage), refresh(a).hire_breedable]).toEqual([4, 0]);
+        expect(Jobs.setAsking(alice, 'x')).toBe('The wage must be 1 to 15 coins a day, or empty if you are not looking for work.');
+        expect(Jobs.setAsking(alice, '0')!.startsWith('The wage must be 1 to 15')).toBe(true);
+        expect(Jobs.setAsking(alice, '16')!.startsWith('The wage must be 1 to 15'), 'A Master\'s pay, at most.').toBe(true);
+        expect(Jobs.setAsking(alice, ' 4 ')).toBeNull();
+        expect(Number(refresh(a).wage)).toBe(4);
         expect(Anthros.forHire().map((w: Row) => w.id)).toEqual([a.id]);
         expect(Jobs.setAsking(alice, '')).toBeNull();
         expect(refresh(a).wage).toBeNull();
@@ -77,13 +77,13 @@ describe('Jobs', () => {
         const worker = playerAnthro(bob, { name: 'Worker' });
         const baker = Number(scalar("SELECT id FROM game_occupations WHERE title = 'Baker'"));
         expect(Jobs.offerable(worker).size, 'Nothing learned yet.').toBe(0);
-        expect(Jobs.setAsking(bob, '3', true, baker)).toBe("Choose work you've learned the skill for (train at it first).");
+        expect(Jobs.setAsking(bob, '3', baker)).toBe("Choose work you've learned the skill for (train at it first).");
 
         db().run("INSERT INTO game_anthro_skills (anthro_id, skill_id, practice) SELECT ?, id, 30 FROM game_skills WHERE name = 'Cooking'", [worker.id]);
         const offer = Jobs.offerable(worker);
         expect(offer.has(baker)).toBe(true);
         expect(offer.get(baker)!.level).toBe('Journeyman');
-        expect(Jobs.setAsking(bob, '3', true, baker)).toBeNull();
+        expect(Jobs.setAsking(bob, '3', baker)).toBeNull();
         expect(Jobs.offered(refresh(worker))!.title).toBe('Baker');
 
         // Hired, it starts on that work every day.
@@ -96,14 +96,13 @@ describe('Jobs', () => {
     });
 
     test('expected wages', () => {
-        expect([Jobs.expectedWage('Novice', false), Jobs.expectedWage('Novice', true),
-            Jobs.expectedWage('Journeyman', false), Jobs.expectedWage('Journeyman', true), Jobs.expectedWage('Master', false),
-            Jobs.expectedWage('Master', true), Jobs.expectedWage(null, false)]).toEqual([2, 3, 8, 9, 15, 16, 1]);
-        expect(Jobs.WAGE_MAX, 'A Master\'s pay and a coin more.').toBe(16);
-        const master = anthro({ name: 'Master', hire_breedable: 1 });
+        expect([Jobs.expectedWage('Novice'), Jobs.expectedWage('Apprentice'),
+            Jobs.expectedWage('Journeyman'), Jobs.expectedWage('Master'), Jobs.expectedWage(null)]).toEqual([2, 4, 8, 15, 1]);
+        expect(Jobs.WAGE_MAX, 'A Master\'s pay.').toBe(15);
+        const master = anthro({ name: 'Master' });
         db().run("INSERT INTO game_anthro_skills (anthro_id, skill_id, practice) SELECT ?, id, 90 FROM game_skills WHERE name = 'Cooking'", [master.id]);
         Jobs.assignWages();
-        expect(Number(refresh(master).wage), 'Unplayed workers ask what their best skill pays.').toBe(16);
+        expect(Number(refresh(master).wage), 'Unplayed workers ask what their best skill pays.').toBe(15);
     });
 
     test('dismiss and quit', () => {
@@ -168,41 +167,40 @@ describe('Jobs', () => {
     });
 
     test('supplying workers', () => {
-        expect(Jobs.supply(0, null, null, null)).toEqual([null, 'Supply 1 to 50 workers at a time.']);
-        expect(Jobs.supply(1, null, null, 17)).toEqual([null, 'Wages are 1 to 16 coins a day.']);
+        expect(Jobs.supply(0, null, null)).toEqual([null, 'Supply 1 to 50 workers at a time.']);
+        expect(Jobs.supply(1, null, 16)).toEqual([null, 'Wages are 1 to 15 coins a day.']);
         const cooking = Number(scalar("SELECT id FROM game_skills WHERE name = 'Cooking'"));
-        expect(Jobs.supply(3, cooking, false, 2)).toEqual([3, null]);
+        expect(Jobs.supply(3, cooking, 2)).toEqual([3, null]);
         const workers: Row[] = Anthros.forHire();
         expect(workers).toHaveLength(3);
         for (const worker of workers) {
             expect(Anthros.isFree(worker)).toBe(true);
-            expect([Number(worker.wage), worker.hire_breedable]).toEqual([2, 0]);
+            expect(Number(worker.wage)).toBe(2);
             const trade = Schedules.skillsOf(worker.id)[0];
             expect(trade.name).toBe('Cooking');
             expect(['Novice', 'Apprentice', 'Journeyman']).toContain(trade.level);
         }
 
-        // Otherwise they ask what their trade pays at their level, and a coin more if they may be bred.
+        // Otherwise they ask what their trade pays at their level.
         const fixed = workers.map((w) => w.id);
-        Jobs.supply(40, null, null, null);
+        Jobs.supply(40, null, null);
         for (const worker of (Anthros.forHire() as Row[]).filter((w) => !fixed.includes(w.id))) {
             const level = Schedules.skillsOf(worker.id)[0].level;
-            expect(Number(worker.wage), `${level}.`).toBe(Schedules.PAY[level] + (worker.hire_breedable ? 1 : 0));
+            expect(Number(worker.wage), `${level}.`).toBe(Schedules.PAY[level]);
         }
     });
 
-    test('only workers hired to be bred can be bred', () => {
+    test('workers can\'t be bred by their employer', () => {
         const alice = player('alice');
         playerAnthro(alice);
         const mate = anthro({ owner: alice, name: 'Mate' });
         const employed = { employed_wage: 1, employed_since: gmdate('Y-m-d H:i:s'), paid_until: gmdate('Y-m-d') };
-        const willing = anthro({ name: 'Willing', gender: 'Female', employer: alice, ...employed });
-        const not = anthro({ name: 'Not', gender: 'Female', employer: alice, hire_breedable: 0, ...employed });
-        expect(Anthros.mayBreed(alice, willing)).toBe(true);
-        expect(Anthros.mayBreed(alice, not)).toBe(false);
+        const worker = anthro({ name: 'Worker', gender: 'Female', employer: alice, ...employed });
+        expect(Anthros.mayBreed(alice, Anthros.findAny(worker.id)!)).toBe(false);
         const me = Anthros.player(alice.id)!.name;
-        expect(Anthros.breedable(alice.id).map((a: Row) => a.name).filter((n: string) => n !== me)).toEqual(['Mate', 'Willing']);
-        expect(Anthros.breed(alice.id, mate.id, willing.id)[1]).toBeNull();
-        expect(Anthros.breed(alice.id, mate.id, not.id)).toEqual([null, 'Choose a sire and a dam from your anthros and employees.']);
+        expect(Anthros.breedable(alice.id).map((a: Row) => a.name).filter((n: string) => n !== me)).toEqual(['Mate']);
+        expect(Anthros.breed(alice.id, mate.id, worker.id)).toEqual([null, 'Choose a sire and a dam from your anthros.']);
+        // Nor planned to breed: the employer plans its work, but not its breeding.
+        expect(Schedules.options(alice, Anthros.findAny(worker.id)!).partners).toEqual([]);
     });
 });

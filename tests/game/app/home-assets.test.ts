@@ -448,7 +448,7 @@ describe('App: home and anthro pages', () => {
         db().run("INSERT INTO game_anthro_skills (anthro_id, skill_id, practice) SELECT ?, id, 30 FROM game_skills WHERE name = 'Cooking'", [worker.id]);
         const baker = Number(scalar("SELECT id FROM game_occupations WHERE title = 'Baker'"));
         const home = get('/game/home', bob).replace(/\s+/g, ' ');
-        expect(home).toMatch(new RegExp('<option value="' + baker + '" > Baker \\(Cooking: Journeyman\\): about 8, or 9 if you may be bred'));
+        expect(home).toMatch(new RegExp('<option value="' + baker + '" > Baker \\(Cooking: Journeyman\\): about 8 </option>'));
         expect(home).toContain('Food costs 5 coins a unit at the');
         post('/game/home', { action: 'set_wage', wage: '3', occupation_id: baker }, bob);
         expect(flash()).toBe("You're on the job market.");

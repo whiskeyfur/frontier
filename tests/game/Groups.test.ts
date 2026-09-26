@@ -242,7 +242,7 @@ describe('Groups', () => {
     test('controls', () => {
         const alice = player('alice');
         expect(Groups.controls(alice, anthro({ owner: alice }))).toBe(true);
-        expect(Groups.controls(alice, anthro({ employer: alice }))).toBe(true);
+        expect(Groups.controls(alice, anthro({ employer: alice })), 'Employees are hired to work, not bred.').toBe(false);
         expect(Groups.controls(alice, anthro())).toBe(false);
         expect(Groups.controls(admin(), anthro())).toBe(true);
     });

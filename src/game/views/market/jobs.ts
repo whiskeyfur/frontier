@@ -28,7 +28,7 @@ export default function jobs(v: ViewContext, { seekers, seekersTotal, q, employe
         Free anthros can't be bought, but they can be hired. Wages (${Jobs.WAGE_MIN} to ${Jobs.WAGE_MAX}
         coins a day) are paid a day at a time from your wallet, the first day when you hire; if you can't pay, the job
         ends. What your workers make (their pay for a trade, food they forage, land they clear) is yours; they feed
-        themselves. You may breed a worker only if it was hired on those terms (such workers ask a coin more).
+        themselves. Workers are hired to work: an employer can't breed them.
     </p>
 
     <h2 class="h5">Looking for work</h2>
@@ -43,7 +43,7 @@ export default function jobs(v: ViewContext, { seekers, seekersTotal, q, employe
                     <thead>
                     <tr>
                         <th data-nosort><input class="form-check-input" type="checkbox" data-select-all title="Select all" aria-label="Select all anthros"></th>
-                        <th>Anthro</th><th>Trade</th><th>May be bred</th><th>Species</th><th>Age</th><th>Fertile</th>
+                        <th>Anthro</th><th>Trade</th><th>Species</th><th>Age</th><th>Fertile</th>
                         <th class="text-end">Wage a day</th><th data-nosort></th>
                     </tr>
                     </thead>
@@ -68,7 +68,6 @@ export default function jobs(v: ViewContext, { seekers, seekersTotal, q, employe
                                     ${trade.name} <span class="text-body-secondary small">(${trade.level}${trade.titles ? ': ' + trade.titles : ''})</span>` : html`
                                     <span class="text-body-secondary">&mdash;</span>`}
                             </td>
-                            <td>${anthro.hire_breedable ? 'Yes' : 'No'}</td>
                             <td>${anthro.species ?? '—'}</td>
                             <td class="text-nowrap" data-sort="${anthro.birthdate}" title="Born ${anthro.birthdate ?? 'unknown'}">${Anthros.age(anthro.birthdate)}</td>
                             <td class="text-nowrap" data-sort="${anthro.fertile_on}">
@@ -102,7 +101,7 @@ export default function jobs(v: ViewContext, { seekers, seekersTotal, q, employe
         <div class="table-responsive">
             <table data-sortable class="table table-striped align-middle">
                 <thead>
-                <tr><th>Anthro</th><th class="text-end">Wage a day</th><th>May be bred</th><th>Hired</th><th>Paid through</th><th data-nosort></th></tr>
+                <tr><th>Anthro</th><th class="text-end">Wage a day</th><th>Hired</th><th>Paid through</th><th data-nosort></th></tr>
                 </thead>
                 <tbody>
                 ${employees.map((anthro) => html`
@@ -112,15 +111,12 @@ export default function jobs(v: ViewContext, { seekers, seekersTotal, q, employe
                             ${gender(v, { gender: anthro.gender, presentsAs: anthro.presents_as })}
                         </td>
                         <td class="text-end" data-sort="${anthro.employed_wage}">${Wallets.format(int(anthro.employed_wage))}</td>
-                        <td>${anthro.hire_breedable ? 'Yes' : 'No'}</td>
                         <td class="text-nowrap" data-sort="${anthro.employed_since}">${String(anthro.employed_since ?? '').substring(0, 10)}</td>
                         <td class="text-nowrap">${anthro.paid_until}</td>
                         <td class="text-end">
                             <form method="post" action="/game/market/jobs" class="d-inline-flex gap-2 m-0">
                                 <input type="hidden" name="csrf" value="${v.csrf}">
                                 <input type="hidden" name="anthro_id" value="${anthro.id}">
-                                ${anthro.hire_breedable ? html`
-                                    <a class="btn btn-sm btn-outline-success" href="/game/assets/${anthro.id}/breed">Breed</a>` : ''}
                                 <button class="btn btn-sm btn-outline-danger" name="action" value="dismiss"
                                         onclick="return confirm(${json_encode('Let ' + anthro.name + ' go? Wages already paid are not returned.')})">
                                     Let go

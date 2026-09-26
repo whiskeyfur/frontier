@@ -1,6 +1,6 @@
 // Upstream: game/views/assets/plan-text.blade.php
 import { html, type Html } from '../../../core/html';
-import { ucfirst } from '../../../core/php';
+import { empty, ucfirst } from '../../../core/php';
 import type { ViewContext } from '../../../core/View';
 import type { Row } from '../../../db/Db';
 import { Schedules } from '../../Schedules';
@@ -18,7 +18,7 @@ export default function planText(_v: ViewContext, { plan }: { plan: Row }): Html
             }
             return html`Train: ${plan.skill_name ?? 'a skill that is gone'}`;
         case 'work':
-            return html`Work as ${plan.occupation_title ?? 'an occupation that is gone'}${plan.occupation_skill != null ? ' (' + plan.occupation_skill + ')' : ''}`;
+            return html`Work as ${plan.occupation_title ?? 'an occupation that is gone'}${!empty(plan.recipe_name) ? ': ' + plan.recipe_name : ''}${plan.occupation_skill != null ? ' (' + plan.occupation_skill + ')' : ''}`;
         case 'clear':
             return html`Clear land in ${plan.part_id ? (plan.part_name ?? 'an expanse') : 'the wilds'}`;
         case 'build':

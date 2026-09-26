@@ -19,7 +19,7 @@ describe('Market', () => {
         expect(Market.sell(alice, 'food', 9)).toBeNull();
         expect([coins(me.id), Goods.amount(me.id)]).toEqual([20, 0]);
         expect(Market.buy(alice, 'food', 0)).toBe('Trade 1 to 10,000 at a time.');
-        expect(Market.buy(alice, 'gold', 1)).toBe('Choose a good.');
+        expect(Market.buy(alice, 'unobtainium', 1)).toBe('Choose a good.');
         expect(Market.buy(player('bobby'), 'food', 1)).toBe('Create or become an anthro first: goods belong to the anthro you play.');
     });
 

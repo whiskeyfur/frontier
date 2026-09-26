@@ -1,4 +1,7 @@
 // Upstream: views/layouts/footer.blade.php
+//
+// Upstream's footer also links the site's privacy policy (/docs/privacy), which isn't part of this port (nothing leaves
+// the browser here).
 import { html, type Html } from '../../../core/html';
 import { gmdate } from '../../../core/php';
 

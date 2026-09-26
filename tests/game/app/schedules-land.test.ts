@@ -45,9 +45,11 @@ describe('App: schedules and land', () => {
         const page = get('/game/assets/' + me.id + '/schedule', alice);
         expect(page).toContain('Weekly routine');
         expect(page).toContain('>Witchcraft</option>');
-        expect(page, 'Not learned yet.').toContain('>Baker (train at Cooking first)</option>');
+        expect(page, 'Not learned yet; a craftsman, by recipe.').toMatch(/>\s*Baker: Bread \(train at Cooking first; 2 flour → 3 bread\)\s*<\/option>/u);
+        expect(page, 'A service job.').toMatch(/>Scribe \(train at Letters first; paid in coins\)<\/option>/);
+        expect(page).toMatch(/>\s*Farmer: Hops \(train at Agriculture first; 3 hops \(on 10 acres of land\)\)\s*<\/option>/u);
         db().run("INSERT INTO game_anthro_skills (anthro_id, skill_id, practice) SELECT ?, id, 1 FROM game_skills WHERE name = 'Cooking'", [me.id]);
-        expect(get('/game/assets/' + me.id + '/schedule', alice), 'Trained: it can work at it.').toContain('>Baker (Cooking)</option>');
+        expect(get('/game/assets/' + me.id + '/schedule', alice), 'Trained: it can work at it.').toMatch(/>\s*Baker: Bread \(Cooking; 2 flour → 3 bread\)\s*<\/option>/u);
         expect(page).toContain('>Clear land in the wilds</option>');
         const days = week({ activity: 'work', detail: 'o:' + scalar("SELECT id FROM game_occupations WHERE title = 'Miller'") });
         post('/game/assets/' + me.id + '/schedule', { action: 'weekly', days }, alice);

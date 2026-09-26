@@ -91,6 +91,7 @@ describe('App: social', () => {
         expect(inbox, 'Messages never name the sending player.').not.toContain('alice');
         const id = Number(scalar("SELECT id FROM game_notifications WHERE body = 'Hello'"));
         post('/game/notifications', { action: 'delete', only: id }, bob);
+        expect(flash()).toBe('Deleted 1 notification. They\'re gone from your list, but administrators can still review them.');
         expect(get('/game/notifications', bob)).not.toContain('Hello');
     });
 

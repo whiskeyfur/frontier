@@ -90,6 +90,14 @@ The schema is SQLite, generated from upstream's real schema (`npm run schema`: `
 generated files. Strings compare case-insensitively when a column is involved (COLLATE NOCASE, like upstream's
 utf8mb4_unicode_ci), and so do their UNIQUE keys and ORDER BY.
 
+A saved game remembers its schema version (`PRAGMA user_version`); `src/db/migrations.ts` brings an older one up to
+date when it's opened. When upstream's `Schema.php` changes, add a migration that does to an existing game what
+upstream's migration does to its database: the same `ALTER TABLE`s (an added column comes last: nothing depends on
+column order), the new tables as `schema.sql` now has them, and the seed rows upstream's migration adds (call the
+ported seeding code, e.g. `Crafts.seed(db)`, where upstream does). Before changing the schema, copy the current
+`schema.sql`, `seed.sql` and `triggers.sql` to `tests/db/v<version>/`, and extend `tests/db/Migrations.test.ts`: a game
+made by each earlier version must migrate to the same tables, columns, keys, indexes and rows as a new one.
+
 **Keep upstream's SQL text** wherever SQLite accepts it; these MariaDB functions are registered so it does
 (`src/db/functions.ts`): `UTC_DATE()`, `UTC_TIMESTAMP()`, `NOW()`, `CURDATE()`, `RAND()`, `IF(c, a, b)`,
 `GREATEST(...)`, `LEAST(...)`, `CONCAT(...)`, `FLOOR`, `CEIL`, `DATEDIFF(a, b)`, `ADDDATE(d, days)`,

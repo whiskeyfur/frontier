@@ -4,6 +4,7 @@ import { Anthros } from '../../../src/game/Anthros';
 import { Auctions } from '../../../src/game/Auctions';
 import { Ranks } from '../../../src/game/Ranks';
 import { Saves } from '../../../src/game/Saves';
+import { Wallets } from '../../../src/game/Wallets';
 import { gmdate, strtotimeOrThrow } from '../../../src/core/php';
 import { flash, get, post, request } from '../../AppHarness';
 import { admin, anthro, baronyId, coins, db, player, playerAnthro, refresh, scalar } from '../../TestCase';
@@ -113,13 +114,14 @@ describe('App: admin', () => {
     test('admins supply workers', () => {
         const boss = admin();
         expect(get('/game/admin/supply', boss)).toContain('Supply workers');
-        post('/game/admin/supply', { action: 'workers', count: 2, skill_id: 'random', breedable: '1', wage: '5' }, boss);
+        post('/game/admin/supply', { action: 'workers', count: 2, skill_id: 'random', wage: '5' }, boss);
         expect(flash()).toBe('Put 2 workers on the job market.');
         const alice = player('alice');
         playerAnthro(alice);
         const page = get('/game/market/jobs', alice);
-        expect(page).toContain('<th>Trade</th><th>May be bred</th>');
-        expect(page.split('<td>Yes</td>').length - 1).toBe(2);
+        expect(page, 'Workers are hired to work: no breeding terms.').toContain('<th>Trade</th><th>Species</th>');
+        expect(page).not.toContain('May be bred');
+        expect(page.split('>5 ' + Wallets.CURRENCY + '</td>').length - 1).toBe(2);
     });
 
     test('saves and reset', () => {

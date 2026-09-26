@@ -3,6 +3,7 @@ import { html, raw, type Html } from '../../core/html';
 import { gmdate, intdiv, strtotimeOrThrow, time } from '../../core/php';
 import type { ViewContext } from '../../core/View';
 import gameLayout from './layouts/game';
+import subnav from './subnav';
 
 export default function changes(v: ViewContext, { html: body }: { html: string }): Html {
     // The daily tick: the first visit after midnight UTC runs the day's business (see Board.runDaily).
@@ -10,8 +11,9 @@ export default function changes(v: ViewContext, { html: body }: { html: string }
     return gameLayout(v, {
         title: 'Changes - Game',
         content: html`
+    ${subnav(v, { section: '/game/docs' })}
     <div class="mx-auto" style="max-width: 48rem">
-        <h1 class="h3 mb-3">What's changed</h1>
+        <h1 class="h3 mb-3">What's changed in Frontier</h1>
         <div class="alert alert-secondary">
             <strong>The day turns over at 00:00 UTC.</strong> The first visit to the game after that runs the new day's business,
             for everyone at once: births and deaths, meals, schedules and default days, taxes, wages and the daily report.

@@ -9,6 +9,7 @@ import { Wallets } from '../../Wallets';
 import anthroLink from '../assets/anthro-link';
 import gender from '../assets/gender';
 import gameLayout from '../layouts/game';
+import subnav from '../subnav';
 import seller from './seller';
 import status from './status';
 
@@ -26,6 +27,7 @@ export default function auctionPage(v: ViewContext, { auction, bids, minimum, ba
     return gameLayout(v, {
         title: auction.anthro_name + ' - Market',
         content: html`
+    ${subnav(v, { section: '/game/market' })}
     <p><a href="/game/market">&larr; Market</a></p>
     <h1 class="h3 mb-3">
         ${auction.anthro_name}

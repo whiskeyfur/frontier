@@ -8,6 +8,7 @@ import { Anthros } from './Anthros';
 import { Auctions } from './Auctions';
 import { Baronies } from './Baronies';
 import { Clock } from './Clock';
+import { Crafts } from './Crafts';
 import { Fiefs } from './Fiefs';
 import { Goods } from './Goods';
 import { Jobs } from './Jobs';
@@ -102,11 +103,15 @@ export class Board {
             }
             const gathered: Record<string, number> = today.gathered.get(keeperId) ?? {};
             const bought: number = meals.bought.get(keeperId) ?? 0;
-            lines.push('Food: ' + (gathered.food ?? 0) + ' gathered, ' + (meals.eaten.get(keeperId) ?? 0) + ' eaten, '
-                + Goods.amount(keeperId, 'food') + ' in store.'
+            // Food is every edible good (see Goods::edibles); the rest of what was made or gathered is listed after.
+            const edibles = Goods.edibles();
+            lines.push('Food: ' + Object.entries(gathered).filter(([good]) => edibles.includes(good)).reduce((sum, [, n]) => sum + n, 0)
+                + ' gathered, ' + (meals.eaten.get(keeperId) ?? 0) + ' eaten, '
+                + Goods.food(keeperId) + ' in store.'
                 + (bought ? ' Bought ' + (bought === 1 ? 'a meal' : `${bought} meals`) + ' at the market for ' + Wallets.format(bought * int(Goods.mealPrice())) + '.' : ''));
-            if (gathered.lumber != null) {
-                lines.push(`Lumber: ${gathered.lumber} gathered, ` + Goods.amount(keeperId, 'lumber') + ' in store.');
+            const other = Object.entries(gathered).filter(([good]) => ![...edibles, 'coins'].includes(good));
+            if (other.length) {
+                lines.push('Made or gathered: ' + other.map(([good, n]) => n + ' ' + Crafts.goodName(good) + ' (' + Goods.amount(keeperId, good) + ' in store)').join(', ') + '.');
             }
             const tax = Fiefs.assessed().get(keeperId) ?? null;
             if (tax) {

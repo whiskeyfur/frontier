@@ -5,6 +5,7 @@ import { array_sum, gmdate, int, float, round, strtotimeOrThrow } from '../core/
 import { Anthros } from './Anthros';
 import { Buildings } from './Buildings';
 import { Clock } from './Clock';
+import { Crafts } from './Crafts';
 import { Fiefs } from './Fiefs';
 import { Goods } from './Goods';
 import { Market } from './Market';
@@ -55,8 +56,9 @@ export class Finances {
         // Food: the household eats from the store, and meals are bought once it's gone.
         const mouths = Goods.household(anthro.id).length;
         const eaten = mouths * Goods.FOOD_PER_DAY * days;
-        const store = Goods.amount(anthro.id);
-        const foodIn = production.goods.food ?? 0;
+        const store = Goods.food(anthro.id);
+        const edibles = Goods.edibles();
+        const foodIn = Math.max(0, array_sum(Object.entries(production.goods).filter(([good]) => edibles.includes(good)).map(([, n]) => n)));
         const bought = Math.max(0, eaten - store - foodIn);
         const price = Goods.mealPrice();
         if (eaten) {
@@ -104,9 +106,9 @@ export class Finances {
 
     /**
      * What the anthros working for masterId (see Schedules::masterOf) are planned to make over days days from from:
-     * {coins, goods: {good: quantity}, by: lines per anthro (see report)}. Work at an occupation pays by
-     * today's level (nothing if its skill isn't learned); foraging brings its average; clearing brings lumber, and
-     * building uses it.
+     * {coins, goods: {good: quantity}, by: lines per anthro (see report)}. Work at an occupation makes its
+     * recipe's goods from its materials, or pays (a service job), by today's level (nothing if its skill isn't learned);
+     * foraging brings its average; clearing brings lumber, and building uses it.
      */
     static production(masterId: number, days: number, from: string): { coins: number; goods: GoodsAmounts; by: FinanceLine[] } {
         const ids = Auth.db().column(
@@ -132,7 +134,19 @@ export class Finances {
                     case 'work': {
                         const skill = int(plan.occupation_skill_id ?? 0);
                         if (learned.includes(skill)) {
-                            coins += (Schedules.PAY as Record<string, number>)[levels.get(skill)!] ?? 0;
+                            // A producer's or craftsman's goods (and the materials they use: see Crafts), or a service job's pay.
+                            const recipe = Crafts.recipeFor(int(plan.occupation_id), plan.recipe_id ?? null);
+                            if (recipe) {
+                                const units = (Crafts.OUTPUT as Record<string, number>)[levels.get(skill)!] ?? 1;
+                                for (const [good, each] of Object.entries(recipe.out)) {
+                                    goods[good] = (goods[good] ?? 0) + units * each;
+                                }
+                                for (const [good, each] of Object.entries(recipe.in)) {
+                                    goods[good] = (goods[good] ?? 0) - units * each;
+                                }
+                            } else {
+                                coins += (Schedules.PAY as Record<string, number>)[levels.get(skill)!] ?? 0;
+                            }
                             what.set(plan.occupation_title, (what.get(plan.occupation_title) ?? 0) + 1);
                         }
                         break;

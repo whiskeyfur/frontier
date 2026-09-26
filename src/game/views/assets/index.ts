@@ -246,7 +246,7 @@ export default function index(v: ViewContext, { heading = null, anthros, listed,
     ${employees.length ? html`
         <h2 class="h5 mt-4">Employees</h2>
         <p class="text-body-secondary small">
-            Free anthros you've hired; you can breed them. Manage them on the <a href="/game/market/jobs">job market</a>.
+            Free anthros you've hired to work for you. Manage them on the <a href="/game/market/jobs">job market</a>.
         </p>
         <ul class="list-group">
             ${employees.map((anthro) => html`
@@ -257,7 +257,6 @@ export default function index(v: ViewContext, { heading = null, anthros, listed,
                         ${pregnantBadge(v, { anthro })}
                         <span class="text-body-secondary small">${anthro.species ?? ''} &middot; ${Wallets.format(int(anthro.employed_wage))} a day</span>
                     </span>
-                    <a class="btn btn-sm btn-outline-success" href="/game/assets/${anthro.id}/breed">Breed</a>
                 </li>`)}
         </ul>` : ''}
     ${planScript(v)}`,

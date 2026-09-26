@@ -39,11 +39,11 @@ export class Litters {
     /**
      * Records one breeding attempt. If the pair breaks the rules (see Anthros::barrenReason) it's recorded with the
      * reason and no litter; otherwise it adds one cub to the dam's pending litter, starting a new litter if she has
-     * none. ownerId is the anthro that gets the cub (null: see cubOwner); bredBy is null and groupId set when a
-     * breeding group bred on its own.
+     * none. The cubs will belong to the dam's owner (see deliver), whoever bred her. bredBy is null and groupId set
+     * when a breeding group bred on its own.
      * Both parents are notified. Returns {litter: the dam's litter or null, barren: why there's no litter, or null}.
      */
-    static attempt(sire: Row, dam: Row, bredBy: number | null, forced: boolean, ownerId: number | null = null, groupId: number | null = null): BreedingOutcome {
+    static attempt(sire: Row, dam: Row, bredBy: number | null, forced: boolean, groupId: number | null = null): BreedingOutcome {
         const db = Auth.db();
         db.beginTransaction();
         // Re-read the dam, so simultaneous attempts can't both start a litter or overfill one. (Upstream locks her
@@ -63,9 +63,9 @@ export class Litters {
             }
         }
         db.run(
-            `INSERT INTO game_breedings (sire_id, dam_id, litter_id, bred_by, owner_id, forced, barren_reason, group_id)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [sire.id, dam.id, litterId, bredBy, ownerId, int(forced), barren, groupId],
+            `INSERT INTO game_breedings (sire_id, dam_id, litter_id, bred_by, forced, barren_reason, group_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [sire.id, dam.id, litterId, bredBy, int(forced), barren, groupId],
         );
         db.commit();
         const outcome: BreedingOutcome = { litter: barren === null ? Litters.pending(dam.id) : null, barren };
@@ -148,8 +148,9 @@ export class Litters {
             db.rollBack();
             return 0;
         }
+        // Every cub is its mother's owner's: hers, when she's free (a free employee's cubs are her own).
         const attempts = db.all(
-            `SELECT b.id, b.sire_id, b.dam_id, b.owner_id, s.species_id AS sire_species, d.species_id AS dam_species,
+            `SELECT b.id, b.sire_id, b.dam_id, s.species_id AS sire_species, d.species_id AS dam_species,
                     d.owner_id AS dam_owner, d.player_id AS dam_player
              FROM game_breedings b
              LEFT JOIN game_anthros s ON s.id = b.sire_id

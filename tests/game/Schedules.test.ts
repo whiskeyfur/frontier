@@ -49,21 +49,21 @@ describe('Schedules', () => {
     test('train first then work', () => {
         const alice = player('alice');
         const me = playerAnthro(alice, { name: 'Me' });
-        const baker = occupationId('Baker');
-        expect(Schedules.options(alice, me).learned).not.toContain(skillId('Cooking'));
-        expect(Schedules.planDay(alice, me, gmdate('Y-m-d'), 'work', 'o:' + baker), 'It can be planned ahead of the training.').toBeNull();
+        const scribe = occupationId('Scribe');
+        expect(Schedules.options(alice, me).learned).not.toContain(skillId('Letters'));
+        expect(Schedules.planDay(alice, me, gmdate('Y-m-d'), 'work', 'o:' + scribe), 'It can be planned ahead of the training.').toBeNull();
         Schedules.runToday();
-        expect(Schedules.log(me.id)[0].outcome).toBe("Meant to work as Baker, but hasn't trained at Cooking yet: rested.");
+        expect(Schedules.log(me.id)[0].outcome).toBe("Meant to work as Scribe, but hasn't trained at Letters yet: rested.");
         expect(coins(me.id), 'No pay.').toBe(0);
         expect(Schedules.skillsOf(me.id), 'And nothing learned.').toEqual([]);
 
-        // A day's training, and it can work as a Baker.
-        learn(me, 'Cooking');
-        expect(Schedules.options(alice, me).learned).toContain(skillId('Cooking'));
+        // A day's training, and it can work as a Scribe: a service job, paid in coins.
+        learn(me, 'Letters');
+        expect(Schedules.options(alice, me).learned).toContain(skillId('Letters'));
         db().exec('DELETE FROM game_schedule_log');
         db().exec("DELETE FROM game_daily WHERE task = 'schedules'");
         Schedules.runToday();
-        expect(Schedules.log(me.id)[0].outcome).toBe('Worked as Baker (Cooking: Novice), earning 2 coins.');
+        expect(Schedules.log(me.id)[0].outcome).toBe('Worked as Scribe (Letters: Novice), earning 2 coins.');
     });
 
     test('anthros that keep themselves live by a trade', () => {
@@ -83,7 +83,10 @@ describe('Schedules', () => {
         const trade = Schedules.tradeOf(baker)!;
         expect(baker.trade_occupation_id, 'A trade of its own...').toBe(trade.id);
         expect(Schedules.learned(baker.id), '...that it knows.').toContain(trade.skill_id);
-        expect(Schedules.log(baker.id)[0].outcome.startsWith(`Worked as ${trade.title}`)).toBe(true);
+        // (Buying its materials first, if its trade is a craft.)
+        const title = trade.title.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&'); // preg_quote
+        expect(Schedules.log(baker.id)[0].outcome).toMatch(new RegExp('^(Bought [^.]+\\. )?(Worked|Meant to work) as ' + title));
+        expect(trade.title, 'Never a trade that needs land.').not.toBe('Farmer');
         expect(Goods.amount(baker.id), 'It buys toward a week\'s food...').toBeLessThanOrEqual(Schedules.INDEPENDENT_FOOD_DAYS);
         expect(Schedules.log(baker.id)[0].outcome, '...with what it earns.').toContain('Bought ');
         for (const other of [played, planned, slave]) {
@@ -304,8 +307,8 @@ describe('Schedules', () => {
         Schedules.planDay(alice, me, today, 'breed', 'p:' + mate.id);
         Schedules.planDay(alice, scholar, today, 'train', 's:' + skillId('Letters'));
         expect(Schedules.planDay(alice, mate, today, 'work', '')).toBe('Choose what to work at: an occupation, clearing land, building or foraging.');
-        Schedules.planDay(alice, mate, today, 'work', 'o:' + occupationId('Weaver'));
-        learn(mate, 'Weaving');
+        Schedules.planDay(alice, mate, today, 'work', 'o:' + occupationId('Servant'));
+        learn(mate, 'Service');
 
         expect(Schedules.runToday()).toBe(3);
         expect(Schedules.runToday(), 'Once a day.').toBe(0);
@@ -314,9 +317,9 @@ describe('Schedules', () => {
         expect(Schedules.log(me.id)[0].outcome).toBe('Bred with Mate: Mate is expecting a litter of 1.');
         expect(Schedules.skillsOf(scholar.id)).toEqual([{ name: 'Letters', practice: 1, level: 'Novice', titles: 'Scribe, Clerk' }]);
         expect(Schedules.log(scholar.id)[0].outcome).toBe('Trained: Letters (Novice).');
-        expect(Schedules.log(mate.id)[0].outcome).toBe('Worked as Weaver (Weaving: Novice), earning 2 coins for Me.');
+        expect(Schedules.log(mate.id)[0].outcome).toBe('Worked as Servant (Service: Novice), earning 2 coins for Me.');
         expect(coins(me.id), 'A slave\'s pay goes to its owner.').toBe(2);
-        expect(Schedules.skillsOf(mate.id).map((s) => s.name), 'Work is practice too.').toEqual(['Weaving']);
+        expect(Schedules.skillsOf(mate.id).map((s) => s.name), 'Work is practice too.').toEqual(['Service']);
     });
 
     test('breeding in a group and losing a partner', () => {
@@ -414,6 +417,17 @@ describe('Schedules', () => {
         Schedules.runToday();
         const lot = db().row(`SELECT * FROM game_parcels WHERE anthro_id = ${me.id}`)!;
         expect([lot.barony_id, lot.part_id, lot.acres], 'Its own land, in that expanse.').toEqual([barony, expanse, 0.25]);
+
+        // Never onto a fief there, however big: that's held of a lord. Its own lot grows instead.
+        const lord = anthro({ name: 'Lord' });
+        db().run('INSERT INTO game_parcels (anthro_id, acres, barony_id, part_id, held_of, tenure) VALUES (?, 50, ?, ?, ?, ?)',
+            [me.id, barony, expanse, lord.id, String(lord.id)]);
+        const fief = db().lastInsertId();
+        db().exec('DELETE FROM game_schedule_log');
+        db().exec("DELETE FROM game_daily WHERE task = 'schedules'");
+        Schedules.runToday();
+        expect(scalar('SELECT acres FROM game_parcels WHERE id = ?', [fief])).toBe(50);
+        expect(scalar('SELECT acres FROM game_parcels WHERE id = ?', [lot.id])).toBe(0.5);
     });
 
     test('everyone eats from their keeper', () => {

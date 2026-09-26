@@ -8,7 +8,7 @@ import { Goods } from '../../../src/game/Goods';
 import { Preferences } from '../../../src/game/Preferences';
 import { flash, get, post, request } from '../../AppHarness';
 import {
-    admin, anthro, coins, db, genderId, player, playerAnthro, refresh, scalar, setCoins, user,
+    admin, anthro, baronyId, coins, db, genderId, player, playerAnthro, refresh, scalar, setCoins, user,
 } from '../../TestCase';
 
 /**
@@ -24,6 +24,13 @@ function panel(page: string): string {
 function body(page: string): string {
     const p = panel(page);
     return p === '' ? page : page.split(p).join('');
+}
+
+/**
+ * Each menu item's page: its own, or for Docs (which has none of its own), its first.
+ */
+function menuPages(): string[] {
+    return Object.keys(App.PAGES).map((href) => (href === '/game/docs' ? Object.keys(App.SUBPAGES[href])[0] : href));
 }
 
 const escapeRegExp = (s: string): string => s.replace(/[.*+?^${}()|[\]\\/#]/g, '\\$&');
@@ -66,7 +73,7 @@ describe('App: general', () => {
     test('every page loads for a player', () => {
         const alice = player('alice');
         playerAnthro(alice);
-        for (const path of [...Object.keys(App.PAGES), '/game/market/jobs', '/game/market/land', '/game/notifications']) {
+        for (const path of [...menuPages(), '/game/market/jobs', '/game/market/land', '/game/notifications', '/game/docs/changes']) {
             // (Upstream looks for '</html>': the pages here are the body, which ends with the layout's footer.)
             expect(get(path, alice), path).toContain('</main>');
         }
@@ -74,7 +81,7 @@ describe('App: general', () => {
 
     test('every page loads for a player without an anthro', () => {
         const alice = player('alice');
-        for (const path of [...Object.keys(App.PAGES), '/game/market/jobs', '/game/market/land', '/game/notifications']) {
+        for (const path of [...menuPages(), '/game/market/jobs', '/game/market/land', '/game/notifications', '/game/docs/changes']) {
             get(path, alice);
         }
         expect(get('/game/home', alice)).toContain('Create my anthro');
@@ -219,7 +226,7 @@ describe('App: general', () => {
         expect(location, 'Back where you came from.').toBe('/game/assets/workers');
 
         expect(get('/game/assets/land', alice)).toContain('3 acres');
-        expect(get('/game/assets/goods', alice)).toContain('<th>Food</th>');
+        expect(get('/game/assets/goods', alice)).toContain('<th>Food <span class="badge text-bg-success fw-normal">food</span></th>');
     });
 
     test('only admins get the admin panel', () => {
@@ -303,7 +310,7 @@ describe('App: general', () => {
         const me = playerAnthro(alice);
         anthro({ owner: alice });
         const page = get('/game/assets/goods', alice);
-        expect(page, "A week's food, less today's meals for two.").toMatch(/<th>Food<\/th><td class="text-end">5<\/td>/);
+        expect(page, "A week's food, less today's meals for two.").toMatch(/<th>Food <span class="badge text-bg-success fw-normal">food<\/span><\/th>\s*<td class="text-end">5<\/td>/);
         expect(page).toMatch(/2 mouths to feed, 2 food a day\.\s+That(&#039;|')s 2 days of food\./);
         expect(page).toContain('<th>Lumber</th>');
 
@@ -318,14 +325,16 @@ describe('App: general', () => {
         setCoins(me.id, 20);
         const page = get('/game/market/goods', alice);
         expect(page).toContain('name="trade" value="buy:food"');
+        expect(page, 'Sortable and filtered.').toContain('<table data-sortable');
+        expect(page, 'Food goods say so.').toMatch(/<td>Bread<\/td>\s*<td>food<\/td>/);
         post('/game/market/goods', { trade: 'buy:lumber', quantity: { lumber: 3, food: 1 } }, alice);
         expect(flash()).toBe('Bought 3 lumber.');
         expect([coins(me.id), Goods.amount(me.id, 'lumber')]).toEqual([5, 3]);
 
-        post('/game/admin/goods', { action: 'save', good: '', name: 'Ale', buy_price: '4', sell_price: '1', sort_order: 30 }, boss);
+        post('/game/admin/goods', { action: 'save', good: '', name: 'Mead', buy_price: '4', sell_price: '1', sort_order: 30 }, boss);
         expect(flash()).toBe('Saved.');
-        expect(get('/game/market/goods', alice)).toContain('name="trade" value="buy:ale"');
-        const [, , page2] = request('POST', '/game/admin/goods', { action: 'save', good: 'ale', name: 'Ale', buy_price: '4', sell_price: '6' }, boss);
+        expect(get('/game/market/goods', alice)).toContain('name="trade" value="buy:mead"');
+        const [, , page2] = request('POST', '/game/admin/goods', { action: 'save', good: 'mead', name: 'Mead', buy_price: '4', sell_price: '6' }, boss);
         expect(page2).toContain('It can&#039;t sell for more than it costs.');
         const [status] = request('GET', '/game/admin/goods', {}, alice);
         expect(status, 'Admins only.').toBe(404);
@@ -352,12 +361,47 @@ describe('App: general', () => {
     });
 
     test('changes page', () => {
-        const page = get('/game/changes', player('alice'));
+        const alice = player('alice');
+        const page = get('/game/docs/changes', alice);
         expect(page).toContain("What's changed");
-        expect(page).toContain('<h2>2026-09-25</h2>');
-        expect(page, "It's in the game menu.").toContain('href="/game/changes"');
+        expect(page).toContain('<h2 id="2026-09-25">2026-09-25</h2>');
+        expect(page, 'Admin tools only for admins.').not.toContain('Admins speak for anthros');
+        expect(get('/game/docs/changes', admin())).toContain('Admins speak for anthros');
+        expect(page, 'Under Docs in the game menu.').toMatch(/class="dropdown-item active" href="\/game\/docs\/changes"/);
+        expect(request('GET', '/game/changes', {}, alice)[1], 'Its old address.').toBe('/game/docs/changes');
         expect(page).toContain('The day turns over at 00:00 UTC.');
         expect(page).toContain('Next: ' + gmdate('Y-m-d', strtotimeOrThrow('tomorrow')) + ' 00:00 UTC');
+    });
+
+    test('pages within a section show its bar', () => {
+        const alice = player('alice');
+        playerAnthro(alice);
+        const pet = anthro({ owner: alice });
+        // An anthro's pages are under Assets (Overview); the game home has its own bar.
+        for (const path of ['/game/assets/' + pet.id, '/game/assets/' + pet.id + '/schedule', '/game/assets/' + pet.id + '/breed']) {
+            expect(get(path, alice), path).toMatch(/class="nav-link px-3 py-2 active" href="\/game\/assets"/);
+        }
+        expect(get('/game/home', alice)).toMatch(/class="nav-link px-3 py-2 active" href="\/game\/home"/);
+        // A barony is under Lands, not Nobility (the longest address that starts it).
+        const barony = get('/game/court/lands/' + baronyId(), alice);
+        expect(barony).toMatch(/class="nav-link px-3 py-2 active" href="\/game\/court\/lands"/);
+        expect(barony).not.toMatch(/class="nav-link px-3 py-2 active" href="\/game\/court"/);
+    });
+
+    test('knowledge base', () => {
+        const alice = player('alice');
+        expect(request('GET', '/game/docs', {}, alice)[1]).toBe('/game/docs/knowledge-base');
+        const page = get('/game/docs/knowledge-base', alice);
+        expect(page).toMatch(/nav-link dropdown-toggle active" href="\/game\/docs"[^>]*>Docs<\/a>/);
+        expect(page, 'The Docs bar.').toMatch(/class="nav-link px-3 py-2 active" href="\/game\/docs\/knowledge-base"/);
+        // Every section heading has an id, and the contents link to each.
+        const headings = [...page.matchAll(/<h([23]) id="([a-z0-9-]+)">/g)].map((m) => m[2]);
+        expect(headings.length).toBeGreaterThan(10);
+        expect(new Set(headings).size, 'Ids are unique.').toBe(headings.length);
+        for (const id of headings) {
+            expect(page).toContain('href="#' + id + '"');
+        }
+        expect(page).toContain('Frontier Knowledge Base');
     });
 
     test('random name endpoint', () => {

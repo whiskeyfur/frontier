@@ -6,6 +6,7 @@ import type { Row } from '../../../db/Db';
 import { Anthros } from '../../Anthros';
 import { Litters } from '../../Litters';
 import gameLayout from '../layouts/game';
+import subnav from '../subnav';
 import anthroOption from './anthro-option';
 import gender from './gender';
 
@@ -16,13 +17,14 @@ export default function breed(v: ViewContext, { anthro, sires, dams, sireId, dam
     return gameLayout(v, {
         title: 'Breed ' + anthro.name + ' - Game',
         content: html`
+    ${subnav(v, { section: '/game/assets' })}
     <p><a href="/game/assets/${anthro.id}">&larr; ${anthro.name}</a></p>
     <div class="mx-auto" style="max-width: 32rem">
         <h1 class="h3 mb-3">Breed ${anthro.name} ${gender(v, { gender: anthro.gender, presentsAs: anthro.presents_as })}</h1>
         ${error ? html`
             <div class="alert alert-danger">${error}</div>` : ''}
         ${sires.length < 2 ? html`
-            <p>You need at least two anthros (or employees) to breed.</p>
+            <p>You need at least two anthros to breed.</p>
             <a class="btn btn-primary" href="/game/market">Visit the market</a>` : html`
             <form method="post" action="/game/assets/${anthro.id}/breed" class="card card-body">
                 <input type="hidden" name="csrf" value="${v.csrf}">

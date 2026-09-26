@@ -63,11 +63,11 @@ describe('Fiefs', () => {
         const [alice, lord] = playing('alice', { title_rank: 4 });
         const [bob, bobs] = playing('bobby');
         grant(alice, lot(lord.id, 50), '', bob, bobs, 50);
-        // A day's work as a Weaver (2 coins) and a slave foraging (1-3 food) for Bobby.
+        // A day's work as a Servant (2 coins) and a slave foraging (1-3 food) for Bobby.
         const slave = anthro({ owner: bob, name: 'Serf' });
-        const weaver = Number(scalar("SELECT id FROM game_occupations WHERE title = 'Weaver'"));
-        db().run("INSERT INTO game_anthro_skills (anthro_id, skill_id, practice) SELECT ?, id, 1 FROM game_skills WHERE name = 'Weaving'", [bobs.id]);
-        Schedules.planDay(bob, refresh(bobs), gmdate('Y-m-d'), 'work', 'o:' + weaver);
+        const servant = Number(scalar("SELECT id FROM game_occupations WHERE title = 'Servant'"));
+        db().run("INSERT INTO game_anthro_skills (anthro_id, skill_id, practice) SELECT ?, id, 1 FROM game_skills WHERE name = 'Service'", [bobs.id]);
+        Schedules.planDay(bob, refresh(bobs), gmdate('Y-m-d'), 'work', 'o:' + servant);
         Schedules.planDay(bob, slave, gmdate('Y-m-d'), 'work', 'f');
         Schedules.runToday();
         const food = Schedules.today().gathered.get(bobs.id)!.food;

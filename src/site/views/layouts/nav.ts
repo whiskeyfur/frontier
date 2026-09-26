@@ -1,7 +1,9 @@
 // Upstream: views/layouts/nav.blade.php
 //
 // Here there's one app (Frontier) and one account, so the brand isn't a menu of apps, and the account button opens
-// the game's settings (/user: the game file, your name) instead of logging in and out.
+// the game's settings (/user: the game file, your name) instead of logging in and out. Upstream's site-wide Docs menu
+// (its own Knowledge Base, Changes and privacy policy, shown outside the apps) isn't ported: the site's docs aren't
+// part of this port; the game's Docs are in its own menu (App.PAGES).
 import { Auth } from '../../../core/Auth';
 import { cls, html, type Html } from '../../../core/html';
 import type { ViewContext } from '../../../core/View';

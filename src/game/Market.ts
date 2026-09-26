@@ -118,7 +118,7 @@ export class Market {
      * Admin: adds a good (key null: its key is made from its name) or changes one. Empty prices mean the market
      * doesn't trade it that way. Returns an error message, or null.
      */
-    static save(key: string | null, name: string, buy: string, sell: string, order: number): string | null {
+    static save(key: string | null, name: string, buy: string, sell: string, order: number, edible = false): string | null {
         name = trim(name);
         const prices: { buy?: number | null; sell?: number | null } = {};
         for (const [which, raw] of [['buy', buy], ['sell', sell]] as const) {
@@ -140,13 +140,13 @@ export class Market {
             if (key === '' || Market.goods()[key] !== undefined) {
                 return `There's already a good called ${name}.`;
             }
-            db.run('INSERT INTO game_market_goods (good, name, buy_price, sell_price, sort_order) VALUES (?, ?, ?, ?, ?)',
-                [key.slice(0, 20), name, prices.buy, prices.sell, order]);
+            db.run('INSERT INTO game_market_goods (good, name, buy_price, sell_price, sort_order, edible) VALUES (?, ?, ?, ?, ?, ?)',
+                [key.slice(0, 20), name, prices.buy, prices.sell, order, int(edible)]);
         } else if (Market.goods()[key] === undefined) {
             return 'No such good.';
         } else {
-            db.run('UPDATE game_market_goods SET name = ?, buy_price = ?, sell_price = ?, sort_order = ? WHERE good = ?',
-                [name, prices.buy, prices.sell, order, key]);
+            db.run('UPDATE game_market_goods SET name = ?, buy_price = ?, sell_price = ?, sort_order = ?, edible = ? WHERE good = ?',
+                [name, prices.buy, prices.sell, order, int(edible), key]);
         }
         Market.forget();
         return null;
@@ -165,6 +165,9 @@ export class Market {
         }
         if (int(Auth.db().value('SELECT COALESCE(SUM(quantity), 0) FROM game_goods WHERE good = ?', [key])) > 0) {
             return `Anthros have ${good.name} in store: it can't be removed (empty its prices to stop trading it).`;
+        }
+        if (int(Auth.db().value('SELECT COUNT(*) FROM game_recipe_goods WHERE good = ?', [key])) > 0) {
+            return `Recipes use or make ${good.name}: change them first (Admin → Recipes).`;
         }
         Auth.db().run('DELETE FROM game_goods WHERE good = ?', [key]);
         Auth.db().run('DELETE FROM game_market_goods WHERE good = ?', [key]);

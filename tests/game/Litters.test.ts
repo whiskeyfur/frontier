@@ -62,7 +62,7 @@ describe('Litters', () => {
         Litters.attempt(sire, dam, admin().id, true);
         expect(notificationsFor(sire.id)).toHaveLength(1);
         db().exec("INSERT INTO game_breeding_groups (id, name) VALUES (9, 'Hearth')");
-        Litters.attempt(sire, dam, null, false, null, 9);
+        Litters.attempt(sire, dam, null, false, 9);
         expect(notificationsFor(sire.id)[0].startsWith('You were bred with Fern on your own, as members of Hearth:')).toBe(true);
     });
 
@@ -93,7 +93,7 @@ describe('Litters', () => {
 
     test('attempt records group and breeder', () => {
         const [, sire, dam] = pair();
-        Litters.attempt(sire, dam, null, false, null, 77);
+        Litters.attempt(sire, dam, null, false, 77);
         const row = db().row('SELECT bred_by, group_id, forced FROM game_breedings');
         expect(row).toEqual({ bred_by: null, group_id: 77, forced: 0 });
     });
@@ -125,7 +125,7 @@ describe('Litters', () => {
     test('cubs belong to their mother\'s owner whoever bred them', () => {
         const [, sire, dam] = pair();
         const bob = player('bobby');
-        Litters.attempt(sire, dam, bob.id, false, anthroOf(bob));
+        Litters.attempt(sire, dam, bob.id, false);
         db().exec('UPDATE game_litters SET due_on = UTC_DATE()');
         Litters.deliverDue();
         expect(Number(scalar(`SELECT owner_id FROM game_anthros WHERE dam_id = ${dam.id}`))).toBe(dam.owner_id);

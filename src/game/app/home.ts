@@ -2,7 +2,7 @@
 import { Auth, type User } from '../../core/Auth';
 import { field, type Input } from '../../core/http';
 import { Session } from '../../core/Session';
-import { int, str, trim, empty } from '../../core/php';
+import { int, str, trim } from '../../core/php';
 import { App } from '../App';
 import { Anthros } from '../Anthros';
 import { Genders } from '../Genders';
@@ -25,7 +25,7 @@ export function home(app: App, user: User, post: boolean): void {
     const action = p.action ?? '';
     let error: string | null = null;
     if (post && action === 'set_wage') {
-        error = Jobs.setAsking(user, field(p, 'wage'), !empty(p.hire_breedable),
+        error = Jobs.setAsking(user, field(p, 'wage'),
             (p.occupation_id ?? '') === '' ? null : int(p.occupation_id));
         if (error === null) {
             Session.data.flash = trim(field(p, 'wage')) === '' ? "You're not looking for work."

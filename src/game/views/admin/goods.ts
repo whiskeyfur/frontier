@@ -1,6 +1,6 @@
 // Upstream: game/views/admin/goods.blade.php
-import { disabled, html, type Html } from '../../../core/html';
-import { int, json_encode, number_format } from '../../../core/php';
+import { checked, disabled, html, type Html } from '../../../core/html';
+import { empty, int, json_encode, number_format } from '../../../core/php';
 import type { ViewContext } from '../../../core/View';
 import type { Row } from '../../../db/Db';
 import { Market } from '../../Market';
@@ -18,8 +18,9 @@ export default function goods(v: ViewContext, { goods, stock, error }: { goods: 
         The goods the market trades. <strong>Buy</strong> is what a player pays the market for one, <strong>sell</strong>
         what the market pays for one; leave either empty and the market doesn't trade it that way. A good can't sell for
         more than it costs. Food's buy price is also what a meal costs when a store runs out, and sell prices value the goods
-        a vassal's taxes are paid in. Food and lumber are the game's own and can't be removed; others can once nobody has
-        any in store.
+        a vassal's taxes are paid in. <strong>Food</strong> goods feed anthros (each eats one a day, the cheapest first).
+        Food and lumber are the game's own and can't be removed; others can once nobody has any in store and no recipe
+        (<a href="/game/admin/recipes">Recipes</a>) uses or makes them.
     </p>
     ${error ? html`
         <div class="alert alert-danger">${error}</div>` : ''}
@@ -38,6 +39,9 @@ export default function goods(v: ViewContext, { goods, stock, error }: { goods: 
                     <label class="small text-body-secondary">sell
                         <input class="form-control form-control-sm d-inline-block" style="width: 5.5rem" name="sell_price" type="number" min="1"
                                value="${good?.sell_price ?? ''}">
+                    </label>
+                    <label class="small text-body-secondary d-flex align-items-center gap-1">
+                        <input class="form-check-input m-0" type="checkbox" name="edible" value="1" ${checked(!empty(good?.edible))}> food
                     </label>
                     <label class="small text-body-secondary">order
                         <input class="form-control form-control-sm d-inline-block" style="width: 5rem" name="sort_order" type="number"

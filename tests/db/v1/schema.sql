@@ -356,7 +356,6 @@ CREATE TABLE game_market_goods (
     buy_price INTEGER,
     sell_price INTEGER,
     sort_order INTEGER NOT NULL DEFAULT 0,
-    edible INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (good),
     UNIQUE (name)
 );
@@ -461,27 +460,6 @@ CREATE TABLE game_ranks (
     PRIMARY KEY (rank)
 );
 
-CREATE TABLE game_recipe_goods (
-    recipe_id INTEGER NOT NULL,
-    good TEXT COLLATE NOCASE NOT NULL,
-    quantity INTEGER NOT NULL,
-    role TEXT CHECK (role IN ('in','out')) NOT NULL,
-    PRIMARY KEY (recipe_id, role, good),
-    FOREIGN KEY (recipe_id) REFERENCES game_recipes (id) ON DELETE CASCADE,
-    FOREIGN KEY (good) REFERENCES game_market_goods (good) ON DELETE CASCADE
-);
-CREATE INDEX game_recipe_goods__good ON game_recipe_goods (good);
-
-CREATE TABLE game_recipes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    occupation_id INTEGER NOT NULL,
-    name TEXT COLLATE NOCASE NOT NULL,
-    needs_acres REAL,
-    sort_order INTEGER NOT NULL DEFAULT 0,
-    FOREIGN KEY (occupation_id) REFERENCES game_occupations (id) ON DELETE CASCADE
-);
-CREATE INDEX game_recipes__occupation_id ON game_recipes (occupation_id);
-
 CREATE TABLE game_renames (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     anthro_id INTEGER NOT NULL,
@@ -532,7 +510,6 @@ CREATE TABLE game_schedule_days (
     group_id INTEGER,
     skill_id INTEGER,
     occupation_id INTEGER,
-    recipe_id INTEGER,
     part_id INTEGER,
     building_id INTEGER,
     set_by INTEGER,
@@ -544,8 +521,7 @@ CREATE TABLE game_schedule_days (
     FOREIGN KEY (set_by) REFERENCES users (id) ON DELETE SET NULL,
     FOREIGN KEY (occupation_id) REFERENCES game_occupations (id) ON DELETE SET NULL,
     FOREIGN KEY (part_id) REFERENCES game_barony_parts (id) ON DELETE SET NULL,
-    FOREIGN KEY (building_id) REFERENCES game_buildings (id) ON DELETE SET NULL,
-    FOREIGN KEY (recipe_id) REFERENCES game_recipes (id) ON DELETE SET NULL
+    FOREIGN KEY (building_id) REFERENCES game_buildings (id) ON DELETE SET NULL
 );
 CREATE INDEX game_schedule_days__partner_anthro_id ON game_schedule_days (partner_anthro_id);
 CREATE INDEX game_schedule_days__group_id ON game_schedule_days (group_id);
@@ -554,7 +530,6 @@ CREATE INDEX game_schedule_days__set_by ON game_schedule_days (set_by);
 CREATE INDEX game_schedule_days__occupation_id ON game_schedule_days (occupation_id);
 CREATE INDEX game_schedule_days__part_id ON game_schedule_days (part_id);
 CREATE INDEX game_schedule_days__building_id ON game_schedule_days (building_id);
-CREATE INDEX game_schedule_days__recipe_id ON game_schedule_days (recipe_id);
 
 CREATE TABLE game_schedule_log (
     anthro_id INTEGER NOT NULL,
@@ -573,7 +548,6 @@ CREATE TABLE game_schedule_weekly (
     group_id INTEGER,
     skill_id INTEGER,
     occupation_id INTEGER,
-    recipe_id INTEGER,
     part_id INTEGER,
     building_id INTEGER,
     set_by INTEGER,
@@ -585,8 +559,7 @@ CREATE TABLE game_schedule_weekly (
     FOREIGN KEY (set_by) REFERENCES users (id) ON DELETE SET NULL,
     FOREIGN KEY (occupation_id) REFERENCES game_occupations (id) ON DELETE SET NULL,
     FOREIGN KEY (part_id) REFERENCES game_barony_parts (id) ON DELETE SET NULL,
-    FOREIGN KEY (building_id) REFERENCES game_buildings (id) ON DELETE SET NULL,
-    FOREIGN KEY (recipe_id) REFERENCES game_recipes (id) ON DELETE SET NULL
+    FOREIGN KEY (building_id) REFERENCES game_buildings (id) ON DELETE SET NULL
 );
 CREATE INDEX game_schedule_weekly__partner_anthro_id ON game_schedule_weekly (partner_anthro_id);
 CREATE INDEX game_schedule_weekly__group_id ON game_schedule_weekly (group_id);
@@ -595,7 +568,6 @@ CREATE INDEX game_schedule_weekly__set_by ON game_schedule_weekly (set_by);
 CREATE INDEX game_schedule_weekly__occupation_id ON game_schedule_weekly (occupation_id);
 CREATE INDEX game_schedule_weekly__part_id ON game_schedule_weekly (part_id);
 CREATE INDEX game_schedule_weekly__building_id ON game_schedule_weekly (building_id);
-CREATE INDEX game_schedule_weekly__recipe_id ON game_schedule_weekly (recipe_id);
 
 CREATE TABLE game_settings (
     name TEXT COLLATE NOCASE NOT NULL,
@@ -635,7 +607,6 @@ CREATE TABLE game_standard_days (
     group_id INTEGER,
     skill_id INTEGER,
     occupation_id INTEGER,
-    recipe_id INTEGER,
     part_id INTEGER,
     building_id INTEGER,
     set_by INTEGER,
@@ -647,8 +618,7 @@ CREATE TABLE game_standard_days (
     FOREIGN KEY (occupation_id) REFERENCES game_occupations (id) ON DELETE SET NULL,
     FOREIGN KEY (part_id) REFERENCES game_barony_parts (id) ON DELETE SET NULL,
     FOREIGN KEY (building_id) REFERENCES game_buildings (id) ON DELETE SET NULL,
-    FOREIGN KEY (set_by) REFERENCES users (id) ON DELETE SET NULL,
-    FOREIGN KEY (recipe_id) REFERENCES game_recipes (id) ON DELETE SET NULL
+    FOREIGN KEY (set_by) REFERENCES users (id) ON DELETE SET NULL
 );
 CREATE INDEX game_standard_days__partner_anthro_id ON game_standard_days (partner_anthro_id);
 CREATE INDEX game_standard_days__group_id ON game_standard_days (group_id);
@@ -657,7 +627,6 @@ CREATE INDEX game_standard_days__occupation_id ON game_standard_days (occupation
 CREATE INDEX game_standard_days__part_id ON game_standard_days (part_id);
 CREATE INDEX game_standard_days__building_id ON game_standard_days (building_id);
 CREATE INDEX game_standard_days__set_by ON game_standard_days (set_by);
-CREATE INDEX game_standard_days__recipe_id ON game_standard_days (recipe_id);
 
 CREATE TABLE game_standard_schedules (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

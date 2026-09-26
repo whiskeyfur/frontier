@@ -4,16 +4,19 @@ import { int, str } from '../../../core/php';
 import type { ViewContext } from '../../../core/View';
 import type { Row } from '../../../db/Db';
 import { Schedules, type PlanOptions } from '../../Schedules';
+import planOccupation from './plan-occupation';
 
 /*
  * One day's plan: what to do, and with whom or at what (plan: its current plan, or what was just sent: activity
  * and detail; names: the field names; options: see Schedules.options; invalid: marks it as the day in error).
- * Breeding picks a partner or a breeding group; training, a skill; work, an occupation, clearing land (where),
- * building (which building) or foraging (see Schedules.checked).
+ * Breeding picks a partner or a breeding group; training, a skill; work, an occupation (one of its recipes, for a
+ * producer or craftsman: see Crafts), clearing land (where), building (which building) or foraging (see
+ * Schedules.checked).
  */
 export default function planFields(_v: ViewContext, { plan, names, options, invalid = false }: {
     plan: Row; names: [string, string]; options: PlanOptions; invalid?: boolean;
 }): Html {
+    const recipes = options.recipes ?? new Map();
     let detail: string;
     if (plan.detail != null) {
         detail = str(plan.detail);
@@ -21,7 +24,8 @@ export default function planFields(_v: ViewContext, { plan, names, options, inva
         switch (plan.activity ?? 'rest') {
             case 'breed': detail = plan.group_id ? 'g:' + plan.group_id : (plan.partner_anthro_id ? 'p:' + plan.partner_anthro_id : ''); break;
             case 'train': detail = plan.skill_id ? 's:' + plan.skill_id : ''; break;
-            case 'work': detail = plan.occupation_id ? 'o:' + plan.occupation_id : ''; break;
+            case 'work': detail = plan.occupation_id ? 'o:' + plan.occupation_id + (plan.recipe_id ? ':' + plan.recipe_id
+                : (recipes.has(int(plan.occupation_id)) ? ':' + recipes.get(int(plan.occupation_id))![0].id : '')) : ''; break;
             case 'clear': detail = 'c:' + (plan.part_id ?? 'wilds'); break;
             case 'build': detail = plan.building_id ? 'b:' + plan.building_id : ''; break;
             case 'forage': detail = 'f'; break;
@@ -53,12 +57,12 @@ export default function planFields(_v: ViewContext, { plan, names, options, inva
         </optgroup>
         <optgroup label="Occupation" data-for="work">
             ${occupations.filter((occupation) => !(learned !== null && !learned.includes(int(occupation.skill_id)))).map((occupation) => html`
-                <option value="o:${occupation.id}" ${selected(detail === 'o:' + occupation.id)}>${occupation.title} (${occupation.skill})</option>`)}
+                ${planOccupation(_v, { occupation, recipes, detail, label: occupation.skill })}`)}
         </optgroup>
         ${learned !== null ? html`
             <optgroup label="Needs training first" data-for="work">
                 ${occupations.filter((occupation) => !learned.includes(int(occupation.skill_id))).map((occupation) => html`
-                    <option value="o:${occupation.id}" ${selected(detail === 'o:' + occupation.id)}>${occupation.title} (train at ${occupation.skill} first)</option>`)}
+                    ${planOccupation(_v, { occupation, recipes, detail, label: 'train at ' + occupation.skill + ' first' })}`)}
             </optgroup>` : ''}
         <optgroup label="Clear land" data-for="work">
             <option value="c:wilds" ${selected(detail === 'c:wilds')}>Clear land in the wilds</option>

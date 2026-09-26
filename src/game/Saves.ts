@@ -1,10 +1,12 @@
 // Upstream: game/src/Saves.php
 import { Auth } from '../core/Auth';
-import { gmdate, int, json_encode, mb_strlen, mb_substr, trim } from '../core/php';
+import { array_fill, gmdate, int, json_encode, mb_strlen, mb_substr, trim } from '../core/php';
 import type { Row } from '../db/Db';
 import { COLUMNS, FOREIGN_KEYS } from '../db/meta';
 import { Anthros } from './Anthros';
 import { Board } from './Board';
+import { Crafts } from './Crafts';
+import { Market } from './Market';
 import { Notifications } from './Notifications';
 import { Ranks } from './Ranks';
 
@@ -20,7 +22,7 @@ export class Saves {
     static readonly MAX_NAME = 100;
 
     // Saved and restored along with the game state, since anthros refer to them.
-    private static readonly CONFIG_TABLES = ['game_species_groups', 'game_species', 'game_genders', 'game_names', 'game_ranks', 'game_skills', 'game_occupations', 'game_building_types', 'game_market_goods'];
+    private static readonly CONFIG_TABLES = ['game_species_groups', 'game_species', 'game_genders', 'game_names', 'game_ranks', 'game_skills', 'game_occupations', 'game_building_types', 'game_market_goods', 'game_recipes', 'game_recipe_goods'];
 
     /**
      * Every save, newest first, without its data.
@@ -114,6 +116,14 @@ export class Saves {
             Saves.dropMissingUsers(tables);
             // Saves from before free anthros owned themselves have no owner for them.
             Anthros.freeUnowned();
+            // Saves from before goods could feed anthros: food, and the seeded goods that are food, feed them.
+            const firstGood: Row | undefined = Object.values<Row>(saved.game_market_goods ?? {})[0];
+            if (firstGood !== undefined && firstGood !== null && !('edible' in firstGood)) {
+                const edible = ['food', ...Object.keys(Crafts.SEED_GOODS).filter((g) => Crafts.SEED_GOODS[g][3])];
+                db.run('UPDATE game_market_goods SET edible = TRUE WHERE good IN (' + array_fill(edible.length, '?').join(', ') + ')', edible);
+            }
+            Market.forget();
+            Crafts.forget();
             Ranks.forget();
             db.commit();
             db.exec('PRAGMA foreign_keys = ON');

@@ -17,7 +17,7 @@ export default function workers(v: ViewContext, { employees }: { employees: Row[
     <h1 class="h3 mb-3">Workers</h1>
     ${subnav(v, { section: '/game/assets' })}
     <p class="text-body-secondary">
-        Free anthros you've hired. Their wages are paid from your wallet each day, and you can breed them. Hire more on
+        Free anthros you've hired to work for you. Their wages are paid from your wallet each day. Hire more on
         the <a href="/game/market/jobs">job market</a>.
     </p>
     ${!employees.length ? html`
@@ -48,7 +48,6 @@ export default function workers(v: ViewContext, { employees }: { employees: Row[
                                 <input type="hidden" name="csrf" value="${v.csrf}">
                                 <input type="hidden" name="anthro_id" value="${anthro.id}">
                                 <input type="hidden" name="back" value="/game/assets/workers">
-                                <a class="btn btn-sm btn-outline-success" href="/game/assets/${anthro.id}/breed">Breed</a>
                                 <button class="btn btn-sm btn-outline-danger" name="action" value="dismiss"
                                         onclick="return confirm(${json_encode('Let ' + anthro.name + ' go? Wages already paid are not returned.')})">
                                     Let go

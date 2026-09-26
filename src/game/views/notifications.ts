@@ -27,7 +27,7 @@ export default function notifications(v: ViewContext, { items, player, prefill, 
                     <input class="form-check-input mt-0" type="checkbox" data-select-all id="select-all-notes" aria-label="Select all">
                     <label class="small" for="select-all-notes">Select all <span class="text-body-secondary" data-selected-count></span></label>
                     <button class="btn btn-sm btn-outline-danger ms-auto"
-                            onclick="return confirm('Delete the selected notifications?')">Delete selected</button>
+                            onclick="return confirm('Delete the selected notifications? They\\'ll be gone from your list, but administrators can still review them.')">Delete selected</button>
                 </div>
                 <ul class="list-group">
                     ${items.map((item) => html`

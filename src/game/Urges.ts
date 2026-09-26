@@ -191,7 +191,7 @@ export class Urges {
                 continue;
             }
             const sire = partner.sire;
-            const outcome = Litters.attempt(sire, dam, null, false, null, partner.group_id);
+            const outcome = Litters.attempt(sire, dam, null, false, partner.group_id);
             bred++;
             const what = `${dam.name} went looking for a mate and bred with ${sire.name}`
                 + (outcome.litter ? ": she's expecting." : ', but no litter will come of it.');
