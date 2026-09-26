@@ -1,0 +1,30 @@
+{
+  "name": "frontier",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Frontier, the anthro-breeding and feudal-life game, as a single self-contained browser page.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "schema": "node tools/convert-schema.mjs",
+    "e2e": "node tools/e2e.cjs"
+  },
+  "devDependencies": {
+    "@types/bootstrap": "^5.2.11",
+    "@types/sql.js": "^1.4.11",
+    "playwright": "1.45",
+    "typescript": "^5.9.3",
+    "vite": "^5.4.21",
+    "vite-plugin-singlefile": "^2.3.3",
+    "vitest": "^2.1.9"
+  },
+  "dependencies": {
+    "bootstrap": "5.3",
+    "marked": "^12.0.2",
+    "sql.js": "^1.14.2"
+  }
+}
