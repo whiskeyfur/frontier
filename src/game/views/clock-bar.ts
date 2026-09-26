@@ -1,4 +1,6 @@
 // Upstream: game/views/clock-bar.blade.php
+//
+// Not upstream: the pace is the player's own choice, not the slowest anyone asks for (see Clock.wanted).
 import { cls, html, raw, type Html } from '../../core/html';
 import { gmdate, number_format } from '../../core/php';
 import type { ViewContext } from '../../core/View';
@@ -28,7 +30,7 @@ export default function clockBar(v: ViewContext): Html {
             return html`
             <button class="${cls('btn btn-sm py-0 px-2', { 'btn-primary': effective || asked, 'pace-effective': effective, 'btn-outline-secondary': !effective && !asked })}"
                     name="time_rate" value="${asked ? '' : pace(option)}"
-                    title="${effective ? 'The game runs at this pace (the slowest anyone asks for)' : ''}${effective && asked ? '; ' : ''}${asked ? 'You ask for this pace: click to stop asking' : (effective ? '' : 'Ask for this pace')}"
+                    title="${effective ? 'The game runs at this pace' : ''}${effective && asked ? '; ' : ''}${asked ? 'You ask for this pace: click to stop asking' : (effective ? '' : 'Ask for this pace')}"
                     ${effective ? raw('aria-current="true"') : ''}>${pace(option)}</button>`;
         })}
     </form>

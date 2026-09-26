@@ -397,22 +397,27 @@ describe('App: general', () => {
         playerAnthro(alice);
         const bob = player('bobby');
         playerAnthro(bob);
-        Preferences.setTimeRate(bob, '2');
+        // Not upstream (there, bob's slower pace would hold): the player's own pace is binding; bob's doesn't count.
+        Preferences.setTimeRate(bob, '0.5');
+        Preferences.setTimeRate(alice, '2');
         Clock.start('1200-01-01');
         let page = get('/game/assets', alice);
         expect(page, "The game's time (before 1970), and its pace.").toMatch(/data-game-clock="-\d+" data-game-rate="2"/);
         expect(page, 'To the second.').toMatch(/>Sat 1 Jan 1200, 00:00:\d\d<\/div>/);
-        expect(page, 'In effect: solid, pulsing.').toMatch(/class="btn btn-sm py-0 px-2 btn-primary pace-effective"\s+name="time_rate" value="2"/);
+        expect(page, 'In effect and asked for: solid, pulsing, and clicked again, no longer asked.').toMatch(/class="btn btn-sm py-0 px-2 btn-primary pace-effective"\s+name="time_rate" value=""/);
         expect(page, 'The rest: outlined.').toMatch(/class="btn btn-sm py-0 px-2 btn-outline-secondary"\s+name="time_rate" value="7"/);
 
-        // Asking for 7: bob's 2 is still the slowest.
+        // Asking for 7: the game runs at 7 at once.
         const [, location] = request('POST', '/game/pace', { time_rate: '7', back: '/game/assets' }, alice);
         expect(location).toBe('/game/assets');
         page = get('/game/assets', alice);
-        expect(page, 'Asked for: solid, and clicked again, no longer asked.').toMatch(/class="btn btn-sm py-0 px-2 btn-primary"\s+name="time_rate" value=""/);
+        expect(page).toMatch(/data-game-rate="7"/);
+        expect(page).toMatch(/class="btn btn-sm py-0 px-2 btn-primary pace-effective"\s+name="time_rate" value=""/);
+        expect(page, 'Bob\'s 0.5 is just another pace to choose.').toMatch(/class="btn btn-sm py-0 px-2 btn-outline-secondary"\s+name="time_rate" value="0.5"/);
         expect(Preferences.timeRate(alice.id)).toBe(7.0);
         request('POST', '/game/pace', { time_rate: '', back: 'https://example.com/' }, alice);
         expect(Preferences.timeRate(alice.id)).toBeNull();
+        expect(get('/game/assets', alice), 'Not asking: a game day a real day.').toMatch(/data-game-rate="1"/);
     });
 
     test('knowledge base', () => {

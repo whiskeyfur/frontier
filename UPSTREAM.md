@@ -11,6 +11,18 @@ This is a browser port of the game Frontier from [whiskeyfur/jcw-website](https:
 
 Ported from upstream `dev` at **a79b6525170a8672e86890e0ffd9ec350949fdb8** (Game clock and pace, peopled resets, starting skills, deploy clears cache, 2026-09-26).
 
+## Local changes
+
+Deliberate differences from upstream, because this is a single-player game in a browser. Keep them when syncing:
+upstream changes to the same code are ported around them. Each is marked in the code with "Not upstream".
+
+- **The game's pace is the player's** (`Clock.wanted`): upstream's shared game runs at the slowest pace anyone playing
+  asks for; here the player's choice is binding, at once, whether or not they play an anthro. The texts that describe
+  it follow (the clock, the clock bar, Preferences, the Knowledge Base), and `changes.md` has an entry for it
+  ("Your pace"); the tests are `Clock.test.ts` ("the player's pace is binding") and `general.test.ts` (the clock bar).
+- The site around the game (accounts, login, CSRF, maintenance, site admin and docs) isn't ported: see PORTING.md
+  and the header comments in `src/site/`.
+
 ## Syncing an upstream change
 
 1. `tools/refresh-ref.sh`: fetches upstream, moves `reference/jcw-website` to `upstream/dev`, and dumps its schema.

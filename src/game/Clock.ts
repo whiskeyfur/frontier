@@ -1,6 +1,7 @@
 // Upstream: game/src/Clock.php
 import { Auth } from '../core/Auth';
 import { onReset } from '../core/caches';
+import { Preferences } from './Preferences';
 import { float, gmdate, int, intdiv, strtotimeOrThrow, time } from '../core/php';
 
 /** The clock's anchor (see Clock.anchor). */
@@ -9,9 +10,11 @@ type Anchor = { game: number; real: number; rate: number; paused: boolean };
 /**
  * The game's clock, apart from the real one. Game time runs from an anchor (a game time and the real moment it was, in
  * game_settings 'clock_game' and 'clock_real'; seconds from the epoch, the game's before it) at a rate: game days per
- * real day (RATE_MIN to RATE_MAX). Each player may ask for a rate (see Preferences); the game runs at the slowest asked
- * for by anyone playing an anthro, or DEFAULT_RATE. When it changes, the anchor moves to now (see sync), so time that
- * has passed keeps the rate it passed at.
+ * real day (RATE_MIN to RATE_MAX). The player chooses the rate (see Preferences), or it's DEFAULT_RATE. When it
+ * changes, the anchor moves to now (see sync), so time that has passed keeps the rate it passed at.
+ *
+ * (Not upstream: upstream's game is shared, so it runs at the slowest rate anyone playing asks for. This one has a
+ * single player, whose choice is binding: see wanted, and UPSTREAM.md's "Local changes".)
  *
  * While the game is down for maintenance the clock stands still (see pause): no days go by.
  *
@@ -113,15 +116,19 @@ export class Clock {
     }
 
     /**
-     * The rate the players ask for: the slowest asked for by anyone playing an anthro (see Preferences), or
-     * DEFAULT_RATE if nobody has asked.
+     * The rate the player asks for (see Preferences), or DEFAULT_RATE if they haven't asked. The player is the one
+     * logged in (in the browser, always the person playing: see src/site/router.ts), or, with nobody logged in, the
+     * account the router would log in: the first admin, else the first account.
+     *
+     * (Not upstream: upstream takes the slowest rate asked for by anyone playing an anthro, so no player can hurry the
+     * others. With a single player there's nobody to wait for: their choice is binding, whether or not they play an
+     * anthro now.)
      */
     static wanted(): number {
-        const slowest = Auth.db().value(
-            `SELECT MIN(p.time_rate) FROM game_preferences p JOIN game_anthros a ON a.player_id = p.user_id
-             WHERE p.time_rate IS NOT NULL AND a.died_at IS NULL`,
-        );
-        return slowest === null ? Clock.DEFAULT_RATE : float(slowest);
+        const users = Auth.user() ? [Auth.user()!] : Auth.allUsers();
+        const player = users.find((u) => Auth.isAdmin(u)) ?? users[0];
+        const rate = player ? Preferences.timeRate(player.id) : null;
+        return rate === null ? Clock.DEFAULT_RATE : rate;
     }
 
     /**

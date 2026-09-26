@@ -1,4 +1,6 @@
 // Upstream: game/views/preferences.blade.php
+//
+// Not upstream: the pace is the player's own choice, not the slowest anyone asks for (see Clock.wanted).
 import { checked, html, type Html } from '../../core/html';
 import { int, number_format } from '../../core/php';
 import type { ViewContext } from '../../core/View';
@@ -43,8 +45,8 @@ export default function preferences(v: ViewContext, { era, timeRate, error }: { 
         <h2 class="h5 mt-2">The game's pace</h2>
         <p class="text-body-secondary small">
             How fast the game's time runs, in game days for each real day: 1 is a game day a real day, 7 a game week, 0.5 a
-            game day every two real days. The game runs at the <strong>slowest pace anyone playing asks for</strong>
-            (now ${pace(Clock.rate())}); leave it empty if you don't mind.
+            game day every two real days. The game runs at <strong>the pace you choose</strong>
+            (now ${pace(Clock.rate())}); leave it empty for a game day each real day.
         </p>
         <div class="d-flex align-items-center gap-2 mb-3">
             <input class="form-control w-auto" style="width: 8rem" id="time_rate" name="time_rate" type="number" min="${Clock.RATE_MIN}"

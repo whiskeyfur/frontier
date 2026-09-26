@@ -2,6 +2,10 @@ Newest first. Add new entries at the top, under a dated heading.
 
 ## 2026-09-26
 
+### Your pace
+- **The game's pace is yours to set:** it runs at the pace you choose (under Preferences, or on the clock), at once,
+  with nobody else to wait for. If you haven't chosen one, a game day each real day.
+
 ### A peopled world
 - **A new game starts with at least 100 commoners,** free and nobody's, each a Journeyman at a trade: first enough
   farmers (given 10 acres each), fishers, hunters and swineherds to feed everyone, then **every other trade**.

@@ -42,9 +42,8 @@ How Frontier works: each of the game's systems, and how they fit together. For w
 - **The game keeps its own calendar**, apart from ours. A new game starts on the date the admins choose
   (**1 January 1200** unless they pick another).
 - **Its time runs at a pace:** so many game days for each real day, from **0.25** (a game day every four real days) to
-  **24** (a game day every real hour). Each player can ask for a pace under **Game → Preferences**; the game runs at
-  the **slowest pace anyone playing asks for**, or a game day each real day if nobody asks. A change of pace counts
-  from then on.
+  **24** (a game day every real hour). Choose it under **Game → Preferences**, or on the clock; the game runs at the
+  **pace you choose**, or a game day each real day if you haven't chosen one. A change of pace counts from then on.
 - **The clock** runs at the right of each section's bar (on a wide screen), with the paces under it: the one the
   game runs at is solid and pulsing, the one you ask for solid, the rest outlined. Click one to ask for it, and yours
   again to stop asking. The Changes page also shows how long until the next game day in real time.

@@ -6,7 +6,7 @@ import { Preferences } from '../../src/game/Preferences';
 import { Saves } from '../../src/game/Saves';
 import { Schedules } from '../../src/game/Schedules';
 import { toGameCalendar } from '../../src/db/migrations';
-import { admin, anthro, db, player, playerAnthro, refresh, scalar } from '../TestCase';
+import { admin, anthro, db, login, player, playerAnthro, refresh, scalar } from '../TestCase';
 
 /**
  * Pretends the anchor was realDays real days ago (at the same game time), as if that much real time had passed.
@@ -33,23 +33,22 @@ describe('Clock', () => {
         expect(Clock.daysBetween('1200-01-01', '1200-01-10')).toBe(9);
     });
 
-    test('the slowest pace anyone playing asks for is kept', () => {
-        const alice = player('alice');
+    // Not upstream (upstream: 'the slowest pace anyone playing asks for is kept'): a single player's pace is binding.
+    test("the player's pace is binding", () => {
+        const alice = admin('alice');
         const bob = player('bobby');
-        const idle = player('idle');
-        playerAnthro(alice);
-        playerAnthro(bob);
-        expect(Clock.wanted(), 'Nobody asks: a game day a real day.').toBe(Clock.DEFAULT_RATE);
+        login(alice);
+        expect(Clock.wanted(), "Not asked: a game day a real day.").toBe(Clock.DEFAULT_RATE);
         expect(Preferences.setTimeRate(alice, '30')).toBe('Ask for 0.25 to 24 game days per real day, or leave it empty.');
         expect(Preferences.setTimeRate(alice, 'fast')).toBe('Ask for 0.25 to 24 game days per real day, or leave it empty.');
         expect(Preferences.setTimeRate(alice, '7')).toBeNull();
-        expect(Preferences.setTimeRate(bob, '2.5')).toBeNull();
-        expect(Preferences.setTimeRate(idle, '0.25')).toBeNull();
-        expect(Clock.rate(), "The slowest of those playing (someone not playing an anthro doesn't count).").toBe(2.5);
-        expect(Preferences.timeRate(bob.id)).toBe(2.5);
-        expect(Preferences.setTimeRate(bob, '')).toBeNull();
-        expect(Clock.rate(), "Bob doesn't mind any more.").toBe(7.0);
-        expect(Preferences.timeRate(bob.id)).toBeNull();
+        expect(Clock.rate(), "The player's pace, at once, though she plays no anthro.").toBe(7.0);
+        expect(Preferences.setTimeRate(bob, '0.25')).toBeNull();
+        expect(Clock.rate(), "Another account's pace doesn't count.").toBe(7.0);
+        expect(Preferences.timeRate(alice.id)).toBe(7.0);
+        playerAnthro(bob);
+        Clock.sync();
+        expect(Clock.rate(), 'Not even when it plays an anthro.').toBe(7.0);
 
         // A change of pace keeps the time that has passed at the pace it passed.
         const before = Clock.time();
