@@ -11,7 +11,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "schema": "node tools/convert-schema.mjs",
-    "e2e": "node tools/e2e.cjs"
+    "e2e": "node tools/e2e.cjs",
+    "deploy": "tools/deploy.sh"
   },
   "devDependencies": {
     "@types/bootstrap": "^5.2.11",

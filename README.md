@@ -17,7 +17,16 @@ npm run dev        # http://localhost:5173
 npm test           # the test suite (vitest)
 npm run typecheck
 npm run build      # dist/index.html
+npm run e2e        # checks dist/index.html in headless Chromium (npx playwright install chromium, once)
+npm run deploy     # publishes to https://whiskeyfur.github.io/frontier/ (see below)
 ```
+
+## Publishing
+
+The game is published on GitHub Pages at **https://whiskeyfur.github.io/frontier/**, from this repository's
+`gh-pages` branch, which holds only the built page. `npm run deploy` builds it here from the commit you have checked
+out (the tree must be clean), runs the type check, the tests and the browser check, and replaces `gh-pages` with
+the new `index.html`. `npm run deploy -- --quick` skips the tests and the browser check.
 
 ## How it's put together
 
