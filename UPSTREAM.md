@@ -14,7 +14,9 @@ Ported from upstream `dev` at **a79b6525170a8672e86890e0ffd9ec350949fdb8** (Game
 ## Local changes
 
 Deliberate differences from upstream, because this is a single-player game in a browser. Keep them when syncing:
-upstream changes to the same code are ported around them. Each is marked in the code with "Not upstream".
+upstream changes to the same code are ported around them. Each is marked in the code with "Not upstream". How the
+game plays differently because of them (and because it has one player) is in DIFFERENCES.md: keep that current too,
+including when an upstream change touches a system it describes.
 
 - **The game's pace is the player's** (`Clock.wanted`): upstream's shared game runs at the slowest pace anyone playing
   asks for; here the player's choice is binding, at once, whether or not they play an anthro. The texts that describe
@@ -34,4 +36,5 @@ upstream changes to the same code are ported around them. Each is marked in the 
 3. Port each change to the matching file (PORTING.md's table). Schema changes: `npm run schema` regenerates
    `src/db/`, and a migration in `src/db/migrations.ts` brings existing saved games along. New or changed triggers go
    in `src/db/triggers.sql` by hand.
-4. `npm test`, then `npm run build`, then update the synced commit above.
+4. `npm test`, then `npm run build`, then update the synced commit above, and DIFFERENCES.md if how the game plays
+   differs in a new way.

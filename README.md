@@ -37,5 +37,6 @@ the new `index.html`. `npm run deploy -- --quick` skips the tests and the browse
 - `src/worker/`: the worker that runs the game and keeps it in IndexedDB.
 - `src/shell/`: the page, which turns links and forms into requests to the worker and shows the answers.
 
+[DIFFERENCES.md](DIFFERENCES.md) is how the game plays differently from the original.
 [PORTING.md](PORTING.md) is how the PHP maps to this code; [UPSTREAM.md](UPSTREAM.md) is which upstream commit this
 matches and how to bring in upstream's changes.
