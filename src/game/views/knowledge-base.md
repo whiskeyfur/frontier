@@ -20,8 +20,8 @@ How Frontier works: each of the game's systems, and how they fit together. For w
 - **Or become one:** any anthro nobody plays that isn't up for auction, dead, or a noble (Baron and up, or married to
   one). It keeps what it has, and its owner if it has one: you can become a slave. A **Become** button is on the
   anthro's page, and the game home lists them.
-- **The choice is permanent.** To play another anthro, **request a reset** from the game home (with a reason); an
-  admin decides. The anthro you leave keeps everything.
+- **To play another anthro, reset:** on the game home, under "Want to play a different anthro?", stop playing yours,
+  then create or become another. The anthro you leave stays in the game and keeps everything, played by nobody.
 - **A new game has people already:** at least 100 free commoners, each a Journeyman at a trade: first enough
   farmers (with 10 acres each), fishers, hunters and swineherds to feed them all, then every other trade. The list of
   anthros to become shows each one's job.

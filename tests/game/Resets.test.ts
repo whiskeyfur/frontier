@@ -54,4 +54,27 @@ describe('Resets', () => {
         expect(scalar('SELECT status FROM game_reset_requests')).toBe('dismissed');
         expect(Resets.dismiss(id, boss.id)).toBe('That request has already been handled.');
     });
+
+    // Not upstream: the player resets themselves, at once, with nobody asked or told.
+    test('a player resets themselves', () => {
+        const boss = admin();
+        const alice = player('alice');
+        const bob = player('bobby');
+        expect(Resets.resetSelf(alice)).toBe("You don't play an anthro, so there's nothing to reset.");
+        let a = playerAnthro(alice);
+        const slave = playerAnthro(bob, { owner: alice });
+        expect(Resets.resetSelf(alice)).toBeNull();
+        a = refresh(a);
+        expect(a.player_id).toBeNull();
+        expect(a.owner_id, 'It stays free.').toBe(a.id);
+        expect(scalar("SELECT COUNT(*) FROM game_reset_requests WHERE status = 'done' AND handled_by = ?", [alice.id])).toBe(1);
+        expect(notificationsForUser(boss.id), 'No admin is told.').toEqual([]);
+        expect(notificationsForUser(alice.id)).toEqual([]);
+        // A request made before is answered by it; an owned anthro keeps its owner.
+        Resets.request(bob, 'Bored');
+        expect(Resets.resetSelf(bob)).toBeNull();
+        expect(Resets.pendingFor(bob.id)).toBeNull();
+        expect(refresh(slave).owner_id).toBe(a.id);
+        expect(refresh(slave).player_id).toBeNull();
+    });
 });

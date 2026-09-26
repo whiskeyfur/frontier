@@ -10,7 +10,6 @@ import { Goods } from '../Goods';
 import { Jobs } from '../Jobs';
 import { Land } from '../Land';
 import { Ranks } from '../Ranks';
-import { Resets } from '../Resets';
 import { Schedules } from '../Schedules';
 import { Wallets } from '../Wallets';
 import gender from './assets/gender';
@@ -23,14 +22,14 @@ import listSearch from './list-search';
 
 export type IndexData = {
     player: Row | null; available: Row[]; gameEmpty: boolean; availableTotal: number; q: string; nobles: Row[];
-    balance: number | null; land: number; resetPending: Row | null; form: HomeForm; canBreed: boolean;
+    balance: number | null; land: number; form: HomeForm; canBreed: boolean;
     canSelfBreed: boolean; genders: Row[]; error: string | null;
     /** The request's form: upstream's views read $_POST directly. */
     post: InputArray;
 };
 
 export default function index(v: ViewContext, data: IndexData): Html {
-    const { player, available, gameEmpty, availableTotal, q, nobles, balance, land, resetPending, form, canBreed, canSelfBreed, error } = data;
+    const { player, available, gameEmpty, availableTotal, q, nobles, balance, land, form, canBreed, canSelfBreed, error } = data;
     const user = v.user!;
     const offerable = player ? Jobs.offerable(player) : new Map<number, Row>();
     return gameLayout(v, {
@@ -162,21 +161,17 @@ export default function index(v: ViewContext, data: IndexData): Html {
                             </form>` : ''}
                         <details class="mt-3">
                             <summary class="small text-body-secondary">Want to play a different anthro?</summary>
-                            ${resetPending ? html`
-                                <p class="small mt-2 mb-0">
-                                    Your reset request from ${String(resetPending.requested_at).substring(0, 10)} is waiting for an admin.
-                                </p>` : html`
-                                <form method="post" action="/game/home" class="mt-2">
-                                    <input type="hidden" name="csrf" value="${v.csrf}">
-                                    <input type="hidden" name="action" value="request_reset">
-                                    <p class="small mb-2">
-                                        You can't switch yourself, but an admin can release ${player.name} so you can
-                                        create or become another anthro. ${player.name} stays in the game with its coins.
-                                    </p>
-                                    <textarea class="form-control form-control-sm mb-2" name="reason" rows="2"
-                                              maxlength="${Resets.MAX_REASON}" placeholder="Reason (optional)"></textarea>
-                                    <button class="btn btn-sm btn-outline-warning">Request a reset</button>
-                                </form>`}
+                            ${/* Not upstream (there, a reset is a request to the admins, with a reason): the player resets at once. */ ''}
+                            <form method="post" action="/game/home" class="mt-2">
+                                <input type="hidden" name="csrf" value="${v.csrf}">
+                                <input type="hidden" name="action" value="reset">
+                                <p class="small mb-2">
+                                    Stop playing ${player.name}, then create or become another anthro.
+                                    ${player.name} stays in the game with everything it has, played by nobody.
+                                </p>
+                                <button class="btn btn-sm btn-outline-warning"
+                                        onclick="return confirm(${json_encode('Stop playing ' + player.name + '?')})">Stop playing ${player.name}</button>
+                            </form>
                         </details>` : ''}
                 </div>
             </div>

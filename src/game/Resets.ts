@@ -9,6 +9,9 @@ import { Notifications } from './Notifications';
  * Players can't change which anthro they play, but can ask the admins to release it. A reset makes that anthro an
  * ordinary anthro again (it keeps its coins, anthros, and its owner or freedom) so the player can create or become
  * another.
+ *
+ * (Not upstream: with a single player, who is the admin too, there's nobody to ask. The player resets themselves
+ * (resetSelf), at once and with no message; request, dismiss and the admins' page are kept as they are.)
  */
 export class Resets {
     static readonly MAX_REASON = 500;
@@ -39,6 +42,35 @@ export class Resets {
             + (reason === '' ? '.' : `: "${reason}"`),
             '/game/admin/resets',
         );
+        return null;
+    }
+
+    /**
+     * Not upstream: the player stops playing their anthro, at once: it's released as an admin's reset releases it (it
+     * stays as it was, free or owned, just unplayed), and the player can create or become another. Nobody is asked or
+     * told. It's recorded as a reset they handled themselves. Returns an error message, or null.
+     */
+    static resetSelf(user: Row): string | null {
+        const anthro = Anthros.player(user.id);
+        if (!anthro) {
+            return "You don't play an anthro, so there's nothing to reset.";
+        }
+        const db = Auth.db();
+        const pending = Resets.pendingFor(user.id);
+        db.beginTransaction();
+        db.run('UPDATE game_anthros SET player_id = NULL WHERE id = ?', [anthro.id]);
+        if (pending) {
+            // A request made before this rule is answered by it.
+            db.run("UPDATE game_reset_requests SET status = 'done', handled_by = ?, handled_at = UTC_TIMESTAMP() WHERE id = ?",
+                [user.id, pending.id]);
+        } else {
+            db.run(
+                `INSERT INTO game_reset_requests (user_id, anthro_id, status, handled_by, handled_at)
+                 VALUES (?, ?, 'done', ?, UTC_TIMESTAMP())`,
+                [user.id, anthro.id, user.id],
+            );
+        }
+        db.commit();
         return null;
     }
 

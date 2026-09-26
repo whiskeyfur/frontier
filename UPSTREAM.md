@@ -20,6 +20,9 @@ upstream changes to the same code are ported around them. Each is marked in the 
   asks for; here the player's choice is binding, at once, whether or not they play an anthro. The texts that describe
   it follow (the clock, the clock bar, Preferences, the Knowledge Base), and `changes.md` has an entry for it
   ("Your pace"); the tests are `Clock.test.ts` ("the player's pace is binding") and `general.test.ts` (the clock bar).
+- **The player resets themselves** (`Resets.resetSelf`, the home page's "Stop playing" button): upstream's player
+  asks the admins, with a reason, and waits; here the anthro is released at once with no notification. The admins'
+  resets page and `Resets.request`/`dismiss` are kept. Tests: `Resets.test.ts` and `home-assets.test.ts`.
 - The site around the game (accounts, login, CSRF, maintenance, site admin and docs) isn't ported: see PORTING.md
   and the header comments in `src/site/`.
 

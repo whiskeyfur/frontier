@@ -2,6 +2,10 @@ Newest first. Add new entries at the top, under a dated heading.
 
 ## 2026-09-26
 
+### Resetting your anthro
+- **Stop playing your anthro whenever you like,** from the game home: no request to wait on. It stays in the game with
+  everything it has, and you create or become another.
+
 ### Your pace
 - **The game's pace is yours to set:** it runs at the pace you choose (under Preferences, or on the clock), at once,
   with nobody else to wait for. If you haven't chosen one, a game day each real day.

@@ -44,10 +44,12 @@ export function home(app: App, user: User, post: boolean): void {
             Session.data.flash = 'You bought your freedom: you now own yourself.';
             app.redirect('/game/home');
         }
-    } else if (post && action === 'request_reset') {
-        error = Resets.request(user, field(p, 'reason'));
+    } else if (post && action === 'reset') {
+        // Not upstream (there, 'request_reset' asks the admins): the player releases their anthro at once.
+        const released = player?.name;
+        error = Resets.resetSelf(user);
         if (error === null) {
-            Session.data.flash = 'Your reset request was sent to the admins.';
+            Session.data.flash = `You no longer play ${released}. Create or become an anthro to play again.`;
             app.redirect('/game/home');
         }
     } else if (post && action === 'self_breed') {
@@ -95,7 +97,6 @@ export function home(app: App, user: User, post: boolean): void {
             : Anthros.availableNobles(),
         balance: player ? Wallets.balance(player.id) : null,
         land: player ? Land.totalAcres(player.id) : 0,
-        resetPending: Resets.pendingFor(user.id),
         form,
         // Only an owner can breed an anthro, so players owned by someone else can't breed themselves.
         canBreed: !!player && Anthros.isOwner(user, player) && Anthros.canBreed(user.id, player),

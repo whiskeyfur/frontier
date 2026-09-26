@@ -476,4 +476,21 @@ describe('App: home and anthro pages', () => {
         expect(page).toContain('name="urge_rise" type="number"');
         expect(page).toContain('2 days so far: 40% today.');
     });
+
+    // Not upstream (there, a reset is a request the admins answer): the player stops playing their anthro at once.
+    test('resetting your anthro from the home page', () => {
+        const alice = player('alice');
+        const me = playerAnthro(alice, { name: 'Ember' });
+        let page = get('/game/home', alice);
+        expect(page).toContain('name="action" value="reset"');
+        expect(page).toContain('Stop playing Ember</button>');
+        expect(page).not.toContain('name="reason"');
+        expect(post('/game/home', { action: 'reset' }, alice)).toBe('/game/home');
+        expect(flash()).toBe('You no longer play Ember. Create or become an anthro to play again.');
+        expect(refresh(me).player_id).toBeNull();
+        page = get('/game/home', alice);
+        expect(page, 'Free to create or become another.').toContain("Create the anthro you'll play as");
+        expect(page).not.toContain('Stop playing');
+    });
 });
+
