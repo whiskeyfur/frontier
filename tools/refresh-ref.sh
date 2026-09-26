@@ -22,7 +22,8 @@ mariadb -e "DROP DATABASE IF EXISTS \`$REF_DB\`"
 php bin/migrate.php
 cd ../..
 mysqldump --no-data --skip-comments --skip-add-drop-table --compact --triggers "$REF_DB" > tools/ref/schema.mysql.sql
+# The configuration tables (seeded by upstream's migration) are upstream's Saves::CONFIG_TABLES.
+CONFIG_TABLES=$(php -r 'preg_match("/CONFIG_TABLES = \\[(.*?)\\]/s", file_get_contents($argv[1]), $m); echo str_replace(["\x27", ","], ["", " "], $m[1]);' reference/jcw-website/game/src/Saves.php)
 mysqldump --no-create-info --skip-triggers --skip-comments --compact --skip-extended-insert "$REF_DB" \
-    game_species_groups game_species game_genders game_names game_ranks game_skills game_occupations \
-    game_building_types game_market_goods game_settings > tools/ref/seed.mysql.sql
+    $CONFIG_TABLES game_settings > tools/ref/seed.mysql.sql
 echo "Upstream is at $(git rev-parse --short upstream/dev). Now: npm run schema, and compare with UPSTREAM.md's synced commit."
