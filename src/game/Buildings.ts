@@ -3,6 +3,7 @@ import { Auth } from '../core/Auth';
 import { array_fill, float, int, mb_strlen, round, trim } from '../core/php';
 import type { Row } from '../db/Db';
 import { Anthros } from './Anthros';
+import { Clock } from './Clock';
 import { Goods } from './Goods';
 import { Land } from './Land';
 import { Notifications } from './Notifications';
@@ -158,7 +159,7 @@ export class Buildings {
         }
         const progress = int(building.progress) + 1;
         const done = progress >= int(building.days);
-        Auth.db().run('UPDATE game_buildings SET progress = ?, finished_at = IF(?, UTC_TIMESTAMP(), NULL) WHERE id = ?',
+        Auth.db().run('UPDATE game_buildings SET progress = ?, finished_at = IF(?, ' + Clock.sqlNow() + ', NULL) WHERE id = ?',
             [progress, int(done), building.id]);
         if (done) {
             Notifications.toAnthro(building.holder_id, `The ${building.name} on lot #${building.parcel_id} is finished.`, '/game/assets/land');

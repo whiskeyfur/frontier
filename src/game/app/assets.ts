@@ -3,12 +3,13 @@
 import { Auth, type User } from '../../core/Auth';
 import { field, fieldArray, type InputArray } from '../../core/http';
 import { Session } from '../../core/Session';
-import { array_sum, array_unique, gmdate, int, spaceship, str, trim } from '../../core/php';
+import { array_sum, array_unique, int, spaceship, str, trim } from '../../core/php';
 import type { Row } from '../../db/Db';
 import type { App } from '../App';
 import { Anthros, type BreedOutcome } from '../Anthros';
 import { Auctions } from '../Auctions';
 import { Baronies } from '../Baronies';
+import { Clock } from '../Clock';
 import { Groups } from '../Groups';
 import { Litters } from '../Litters';
 import { Ranks } from '../Ranks';
@@ -216,7 +217,7 @@ export function breedingMessage(sireId: number, damId: number, outcome: BreedOut
 export function pregnancyMessage(dam: Row, litter: Row): string {
     const cubs = litter.cubs + ' ' + (litter.cubs === 1 ? 'cub' : 'cubs');
     return `${dam.name} is pregnant: a litter of ${cubs}, due ${litter.due_on}.`
-        + (litter.cubs < Anthros.maxCubs(dam) && litter.bred_on === gmdate('Y-m-d')
+        + (litter.cubs < Anthros.maxCubs(dam) && litter.bred_on === Clock.today()
             ? ' Breed again today to add another cub.' : '');
 }
 

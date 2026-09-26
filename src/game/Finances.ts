@@ -36,7 +36,7 @@ export class Finances {
      * (coin balance after), food: {store, in, eaten, bought}, taxDay (date or null)}.
      */
     static report(anthro: Row, days: number = Finances.DAYS) {
-        const from = gmdate('Y-m-d', strtotimeOrThrow('+1 day'));
+        const from = Clock.today(1);
         const lines: FinanceLine[] = [];
         const production = Finances.production(anthro.id, days, from);
         for (const row of production.by) {
@@ -235,6 +235,6 @@ export class Finances {
 
     private static nextTaxDay(): string {
         const days = (Fiefs.TAX_WEEKDAY - Clock.weekday() + 7) % 7 || 7;
-        return gmdate('Y-m-d', strtotimeOrThrow(`+${days} days`));
+        return Clock.today(days);
     }
 }

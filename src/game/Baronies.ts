@@ -3,6 +3,7 @@ import { Auth } from '../core/Auth';
 import { array_chunk, array_fill, array_rand, array_sum, int, mb_strlen, pick, random_int, round, trim } from '../core/php';
 import type { Db, Row } from '../db/Db';
 import { Anthros } from './Anthros';
+import { Clock } from './Clock';
 import { Genders } from './Genders';
 import { Names } from './Names';
 import { Notifications } from './Notifications';
@@ -151,7 +152,7 @@ export class Baronies {
             return [null, 0];
         }
         const insert = `INSERT INTO game_anthros (name, gender_id, species_id, birthdate, fertile_on, title_rank, title_since, liege_id, player_id)
-             VALUES (?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), ?, ?)`;
+             VALUES (?, ?, ?, ?, ?, ?, ` + Clock.sqlNow() + `, ?, ?)`;
         const names: string[] = [];
         const lord = (rank: number, liegeId: number | null, playerId: number | null = null): number => {
             const genderId = Genders.randomBirthId();
@@ -180,6 +181,39 @@ export class Baronies {
             }
         }
         return [baron, made];
+    }
+
+    // Settlements a new game asks for (see addSettlements), and the land office's land that comes with each, in acres.
+    static readonly SETTLEMENT_KINDS = ['village', 'town', 'city'];
+    static readonly SETTLEMENT_ACRES: Record<string, [number, number]> = { village: [1500, 2250], town: [1000, 1500], city: [2000, 3000] };
+
+    /**
+     * Makes up the villages, towns and cities to at least wanted ({kind: how many}): those there are count (a court's,
+     * or the empty barony's), and the rest are founded, nobody managing them yet, spread over the baronies in turn, each
+     * with a lot of the land office's (SETTLEMENT_ACRES). Returns how many it founded.
+     */
+    static addSettlements(wanted: Record<string, number>, db: Db | null = null): number {
+        db ??= Auth.db();
+        const baronies: number[] = db.column('SELECT id FROM game_baronies ORDER BY id');
+        if (!baronies.length) {
+            return 0;
+        }
+        const have: Map<string, number> = db.pairs('SELECT kind, COUNT(*) FROM game_barony_parts GROUP BY kind');
+        const names: string[] = db.column('SELECT name FROM game_baronies UNION SELECT name FROM game_barony_parts');
+        const part = 'INSERT INTO game_barony_parts (barony_id, name, kind, manager_anthro_id) VALUES (?, ?, ?, NULL)';
+        const lot = 'INSERT INTO game_parcels (anthro_id, acres, barony_id, part_id) VALUES (NULL, ?, ?, ?)';
+        let founded = 0;
+        for (const kind of Baronies.SETTLEMENT_KINDS) {
+            for (let i = int(have.get(kind) ?? 0); i < int(wanted[kind] ?? 0); i++) {
+                const baronyId = int(baronies[founded % baronies.length]);
+                const name = Baronies.placeName(names);
+                names.push(name);
+                db.run(part, [baronyId, name, kind]);
+                db.run(lot, [random_int(...Baronies.SETTLEMENT_ACRES[kind]), baronyId, db.lastInsertId()]);
+                founded++;
+            }
+        }
+        return founded;
     }
 
     /**

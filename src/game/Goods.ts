@@ -1,8 +1,9 @@
 // Upstream: game/src/Goods.php
 import { Auth } from '../core/Auth';
 import { onReset } from '../core/caches';
-import { array_chunk, array_fill, empty, gmdate, int, intdiv, spaceship } from '../core/php';
+import { array_chunk, array_fill, empty, int, intdiv, spaceship } from '../core/php';
 import type { Row } from '../db/Db';
+import { Clock } from './Clock';
 import { Market } from './Market';
 import { Wallets } from './Wallets';
 
@@ -133,7 +134,7 @@ export class Goods {
      */
     static isHungry(anthro: Row): boolean {
         const onMarket = anthro.owner_id === null || (anthro.auction_id ?? null) !== null;
-        return !onMarket && (anthro.hungry_on ?? null) === gmdate('Y-m-d');
+        return !onMarket && (anthro.hungry_on ?? null) === Clock.today();
     }
 
     /**
@@ -153,7 +154,7 @@ export class Goods {
     static feedToday(): number {
         const db = Auth.db();
         Goods.mealsToday = null;
-        const claimed = db.run("INSERT OR IGNORE INTO game_daily (day, task) VALUES (UTC_DATE(), 'feed')");
+        const claimed = db.run('INSERT OR IGNORE INTO game_daily (day, task) VALUES (' + Clock.sqlToday() + ", 'feed')");
         if (!claimed) {
             return 0;
         }
@@ -184,7 +185,7 @@ export class Goods {
         }
         Goods.mealsToday.hungry = hungry;
         for (const chunk of array_chunk(hungry, 500)) {
-            db.run('UPDATE game_anthros SET hungry_on = UTC_DATE() WHERE id IN (' + array_fill(chunk.length, '?').join(', ') + ')', chunk);
+            db.run('UPDATE game_anthros SET hungry_on = ' + Clock.sqlToday() + ' WHERE id IN (' + array_fill(chunk.length, '?').join(', ') + ')', chunk);
         }
         return hungry.length;
     }

@@ -112,12 +112,12 @@ export function strtotimeOrThrow(text: string, base?: number): number {
     return t;
 }
 
-/** Today in the game's calendar, 'YYYY-MM-DD' (gmdate('Y-m-d')). */
+/** Today (real), 'YYYY-MM-DD' (gmdate('Y-m-d')). The game's own date is Clock.today() (src/game/Clock.ts). */
 export function today(): string {
     return gmdate('Y-m-d');
 }
 
-/** Now, 'YYYY-MM-DD HH:MM:SS' (gmdate('Y-m-d H:i:s')). */
+/** Now (real), 'YYYY-MM-DD HH:MM:SS' (gmdate('Y-m-d H:i:s')). The game's own time is Clock.now(). */
 export function nowDateTime(): string {
     return gmdate('Y-m-d H:i:s');
 }

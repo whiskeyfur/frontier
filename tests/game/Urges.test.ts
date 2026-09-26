@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest';
 import { gmdate, range, strtotimeOrThrow } from '../../src/core/php';
 import type { Row } from '../../src/db/Db';
 import { Anthros } from '../../src/game/Anthros';
+import { Clock } from '../../src/game/Clock';
 import { Groups } from '../../src/game/Groups';
 import { Preferences } from '../../src/game/Preferences';
 import { Ranks } from '../../src/game/Ranks';
@@ -14,7 +15,7 @@ describe('Urges', () => {
     const dam = (days: number, rise: number, fields: Row = {}): Row =>
         anthro({
             gender: 'Female', name: 'Fern', urge_rise: rise,
-            created_at: gmdate('Y-m-d H:i:s', strtotimeOrThrow(`-${days} days`)), ...fields,
+            created_at: Clock.today(-days) + ' 12:00:00', ...fields,
         });
 
     test('rates', () => {

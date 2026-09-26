@@ -11,8 +11,8 @@ import { App } from '../../../game/App';
 
 /**
  * The top navigation bar's contents (the layouts wrap it in a navbar). Inside the game, its pages are menu items
- * (App.PAGES; SUBPAGES as dropdowns). Admins get an Admin button at the top left that opens the admin panel
- * (layouts/admin-panel). bell: show the game's notifications bell (with v.unread).
+ * (App.PAGES; SUBPAGES as dropdowns). Admins get an Admin button at the top right, before the bell (or their
+ * name), that opens the admin panel (layouts/admin-panel). bell: show the game's notifications bell (with v.unread).
  */
 export default function nav(v: ViewContext, { bell = false }: { bell?: boolean } = {}): Html {
     const currentPath = v.path.replace(/\/+$/, '') || '/';
@@ -21,9 +21,6 @@ export default function nav(v: ViewContext, { bell = false }: { bell?: boolean }
     const menu: [Record<string, string>, Record<string, Record<string, string>>] =
         inGame && user && (Auth.isPlayer(user) || Auth.isAdmin(user)) ? [App.PAGES, App.SUBPAGES] : [{}, {}];
     return html`
-${user && Auth.isAdmin(user) ? html`
-    <button class="btn btn-sm btn-warning me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#admin-panel"
-            aria-controls="admin-panel" title="Admin controls">⚙ Admin</button>` : ''}
 <a class="navbar-brand" href="/game/home">Frontier</a>
 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#main-nav"
         aria-controls="main-nav" aria-expanded="false" aria-label="Menu">
@@ -57,6 +54,10 @@ ${user && Auth.isAdmin(user) ? html`
     </ul>
     <div class="d-flex flex-wrap align-items-center gap-2 py-2 py-lg-0">
         ${user ? html`
+            ${Auth.isAdmin(user) ? html`
+                ${/* Opens the admin panel (layouts.admin-panel): this page's admin controls and every admin page. */ ''}
+                <button class="btn btn-sm btn-warning" type="button" data-bs-toggle="offcanvas" data-bs-target="#admin-panel"
+                        aria-controls="admin-panel" title="Admin controls">⚙ Admin</button>` : ''}
             ${bell ? html`
                 <a class="btn btn-sm btn-outline-secondary position-relative" href="/game/notifications"
                    title="Notifications" aria-label="Notifications${v.unread ? ', ' + v.unread + ' unread' : ''}">

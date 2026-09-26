@@ -1,16 +1,18 @@
 // Upstream: game/src/Ranks.php
 import { Auth, type User } from '../core/Auth';
 import { onReset } from '../core/caches';
-import { array_chunk, array_column, array_rand, array_sum, float, int, mb_strlen, random_int, range, shuffle, trim } from '../core/php';
+import { array_chunk, array_column, array_fill, array_rand, array_sum, float, int, mb_strlen, random_int, range, shuffle, trim } from '../core/php';
 import type { Row } from '../db/Db';
 import { Anthros } from './Anthros';
 import { Baronies } from './Baronies';
+import { Clock } from './Clock';
 import { Fiefs } from './Fiefs';
 import { Genders } from './Genders';
 import { Land } from './Land';
 import { Marriages } from './Marriages';
 import { Names } from './Names';
 import { Notifications } from './Notifications';
+import { Schedules } from './Schedules';
 
 /** A row of game_ranks (see Ranks.all). */
 export type Rank = { rank: number; name: string; female_name: string; is_noble: boolean; is_hereditary: boolean };
@@ -370,7 +372,7 @@ export class Ranks {
             return `${anthro.name} already has that rank.`;
         }
         Auth.db().run(
-            'UPDATE game_anthros SET title_rank = ?, title_since = IF(? IS NULL, NULL, UTC_TIMESTAMP()), title_by_land = FALSE, granted_rank = NULL WHERE id = ?',
+            'UPDATE game_anthros SET title_rank = ?, title_since = IF(? IS NULL, NULL, ' + Clock.sqlNow() + '), title_by_land = FALSE, granted_rank = NULL WHERE id = ?',
             [rank, rank, anthro.id],
         );
         // Those it outranked swore to it as their better: brought down to their rank (or below), they're released
@@ -519,7 +521,7 @@ export class Ranks {
         }
         // A granted title it rises above stays as its floor (see holdByLand).
         Auth.db().run(
-            `UPDATE game_anthros SET granted_rank = IF(title_by_land, granted_rank, title_rank), title_rank = ?, title_since = UTC_TIMESTAMP(),
+            `UPDATE game_anthros SET granted_rank = IF(title_by_land, granted_rank, title_rank), title_rank = ?, title_since = ` + Clock.sqlNow() + `,
                                      title_by_land = TRUE WHERE id = ?`,
             [next, anthro.id],
         );
@@ -595,7 +597,7 @@ export class Ranks {
         Marriages.end(anthro, why);
         const dying = why === 'died';
         if (successor) {
-            db.run('UPDATE game_anthros SET title_rank = ?, title_since = UTC_TIMESTAMP(), title_by_land = ?, granted_rank = ?, liege_id = ? WHERE id = ?',
+            db.run('UPDATE game_anthros SET title_rank = ?, title_since = ' + Clock.sqlNow() + ', title_by_land = ?, granted_rank = ?, liege_id = ? WHERE id = ?',
                 [rank, int(anthro.title_by_land ?? 0), anthro.granted_rank ?? null, anthro.liege_id, successor.id]);
             db.run(
                 'UPDATE game_anthros SET liege_id = ? WHERE liege_id = ? AND id <> ? AND ' + Anthros.freeSql('game_anthros'),
@@ -671,11 +673,42 @@ export class Ranks {
     static createCommoners(): number {
         const db = Auth.db();
         const lords: number[] = array_column(Ranks.titled(), 'id');
+        const parts: Map<number, string> = db.pairs('SELECT manager_anthro_id, kind FROM game_barony_parts WHERE manager_anthro_id IS NOT NULL');
+        const lieges: (number | null)[] = [];
+        for (const lordId of lords) {
+            const range: readonly [number, number] | number[] = parts.has(lordId) ? Baronies.PEOPLE[parts.get(lordId)!] : Ranks.COURT_RETAINERS;
+            lieges.push(...array_fill(random_int(range[0], range[1]), lordId));
+        }
+        return Ranks.insertCommoners(lieges);
+    }
+
+    // The fewest free commoners a new game starts with, and the most an admin can ask for (see fillCommoners).
+    static readonly MIN_COMMONERS = 100;
+    static readonly MAX_COMMONERS = 10000;
+
+    /**
+     * Makes up the free commoners (untitled, unplayed, living) to want (at least MIN_COMMONERS), or as many as there are
+     * occupations if that's more, so every trade can be someone's (see Schedules::spreadTrades); the new ones are sworn
+     * to no one yet (see assignLieges). Returns how many it created.
+     */
+    static fillCommoners(want: number = Ranks.MIN_COMMONERS): number {
+        const have = int(Auth.db().value(
+            'SELECT COUNT(*) FROM game_anthros a WHERE a.title_rank IS NULL AND a.player_id IS NULL AND ' + Anthros.freeSql('a'),
+        ));
+        want = Math.max(Ranks.MIN_COMMONERS, want, Schedules.occupations().size);
+        return have >= want ? 0 : Ranks.insertCommoners(array_fill(want - have, null));
+    }
+
+    /**
+     * Creates free, unplayed commoners, one for each entry of lieges (the lord each is sworn to, or null): random
+     * gender, species and name (see createCommoners). Returns how many it created.
+     */
+    private static insertCommoners(lieges: (number | null)[]): number {
+        const db = Auth.db();
         const species: number[] = db.column('SELECT id FROM game_species');
-        if (!lords.length || !species.length) {
+        if (!lieges.length || !species.length) {
             return 0;
         }
-        const parts: Map<number, string> = db.pairs('SELECT manager_anthro_id, kind FROM game_barony_parts WHERE manager_anthro_id IS NOT NULL');
         // Name pools by presentation (see Names), as shuffled queues of names not in use yet.
         const used = new Set<string>(db.column('SELECT name FROM game_anthros'));
         const pools: Record<string, { all: string[]; fresh: string[] }> = {};
@@ -692,21 +725,18 @@ export class Ranks {
             weights = genders.map(() => 1);
         }
         const rows: unknown[][] = [];
-        for (const lordId of lords) {
-            const range: readonly [number, number] | number[] = parts.has(lordId) ? Baronies.PEOPLE[parts.get(lordId)!] : Ranks.COURT_RETAINERS;
-            for (let i = random_int(range[0], range[1]); i > 0; i--) {
-                let roll = random_int(1, array_sum(weights));
-                let index = 0;
-                for (; index < weights.length; index++) {
-                    if ((roll -= weights[index]) <= 0) {
-                        break;
-                    }
+        for (const lordId of lieges) {
+            let roll = random_int(1, array_sum(weights));
+            let index = 0;
+            for (; index < weights.length; index++) {
+                if ((roll -= weights[index]) <= 0) {
+                    break;
                 }
-                const pool = pools[genders[index].presents_as];
-                const name = pool.fresh.length ? pool.fresh.pop()! : pool.all[array_rand(pool.all)];
-                const birthdate = Anthros.randomAdultBirthdate();
-                rows.push([name, genders[index].id, species[array_rand(species)], birthdate, Anthros.randomFertileOn(birthdate), lordId]);
             }
+            const pool = pools[genders[index].presents_as];
+            const name = pool.fresh.length ? pool.fresh.pop()! : pool.all[array_rand(pool.all)];
+            const birthdate = Anthros.randomAdultBirthdate();
+            rows.push([name, genders[index].id, species[array_rand(species)], birthdate, Anthros.randomFertileOn(birthdate), lordId]);
         }
         for (const chunk of array_chunk(rows, 500)) {
             db.run(
@@ -743,7 +773,7 @@ export class Ranks {
             return 0;
         }
         const insert = `INSERT INTO game_anthros (name, gender_id, species_id, birthdate, fertile_on, title_rank, title_since, liege_id)
-             VALUES (?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), ?)`;
+             VALUES (?, ?, ?, ?, ?, ?, ` + Clock.sqlNow() + `, ?)`;
         const create = (rank: number | null, liegeId: number | null, genderId: number | null = null): number => {
             genderId ??= Genders.randomBirthId();
             const birthdate = Anthros.randomAdultBirthdate();

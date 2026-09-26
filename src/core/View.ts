@@ -7,6 +7,7 @@ import { Html, print, raw, type Printable } from './html';
 
 export class ViewContext {
     private stacks = new Map<string, string[]>();
+    private onces = new Set<string>();
     title = '';
 
     constructor(
@@ -27,6 +28,13 @@ export class ViewContext {
         list.push(print(content));
         this.stacks.set(name, list);
         return raw('');
+    }
+
+    /** Blade's @once: true the first time a page asks with this key (name the template), false after. */
+    once(key: string): boolean {
+        if (this.onces.has(key)) return false;
+        this.onces.add(key);
+        return true;
     }
 
     /** Blade's @stack: everything pushed to a stack so far. */

@@ -1,7 +1,7 @@
 // Upstream: game/src/Fiefs.php
 import { Auth, type User } from '../core/Auth';
 import { onReset } from '../core/caches';
-import { float, gmdate, int, number_format, round, spaceship, str, strtotimeOrThrow, trim } from '../core/php';
+import { float, int, number_format, round, spaceship, str, trim } from '../core/php';
 import type { Row } from '../db/Db';
 import { Anthros } from './Anthros';
 import { Buildings } from './Buildings';
@@ -250,7 +250,7 @@ export class Fiefs {
      */
     static mayBeSeized(vassal: Row): boolean {
         return float(vassal.tax_balance) > 0 && vassal.tax_overdue_since !== null
-            && vassal.tax_overdue_since <= gmdate('Y-m-d', strtotimeOrThrow('-' + Fiefs.GRACE_DAYS + ' days'));
+            && vassal.tax_overdue_since <= Clock.today(-Fiefs.GRACE_DAYS);
     }
 
     /**
@@ -344,7 +344,7 @@ export class Fiefs {
      */
     static assessToday(): number {
         const db = Auth.db();
-        if (!db.run("INSERT OR IGNORE INTO game_daily (day, task) VALUES (UTC_DATE(), 'taxes')")) {
+        if (!db.run('INSERT OR IGNORE INTO game_daily (day, task) VALUES (' + Clock.sqlToday() + ", 'taxes')")) {
             return 0;
         }
         Fiefs.assessedTaxes = new Map();
@@ -498,7 +498,7 @@ export class Fiefs {
         change = round(change, 2);
         Auth.db().run(
             `UPDATE game_anthros SET tax_balance = tax_balance + ?,
-                                     tax_overdue_since = IF(tax_balance + ? > 0, IF(?, COALESCE(tax_overdue_since, UTC_DATE()), tax_overdue_since), NULL)
+                                     tax_overdue_since = IF(tax_balance + ? > 0, IF(?, COALESCE(tax_overdue_since, ` + Clock.sqlToday() + `), tax_overdue_since), NULL)
              WHERE id = ?`,
             [change, change, int(collected), vassalId],
         );

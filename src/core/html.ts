@@ -13,6 +13,7 @@
  *   @json($x)                               ${json(x)}
  *   @push('admin') ... @endpush             ${v.push('admin', html`...`)}   (renders nothing where it stands)
  *   @stack('admin')                         ${v.stack('admin')}
+ *   @once ... @endonce                      ${v.once('the/template') ? html`...` : ''}
  *
  * Arrays are joined; null, undefined and false print nothing; true prints 1 (as in PHP).
  */

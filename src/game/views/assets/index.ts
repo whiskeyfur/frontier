@@ -1,10 +1,11 @@
 // Upstream: game/views/assets/index.blade.php
 import { html, selected, type Html } from '../../../core/html';
-import { gmdate, int, strtotimeOrThrow } from '../../../core/php';
+import { int } from '../../../core/php';
 import type { ViewContext } from '../../../core/View';
 import type { Row } from '../../../db/Db';
 import { Anthros } from '../../Anthros';
 import { Auctions } from '../../Auctions';
+import { Clock } from '../../Clock';
 import { Groups } from '../../Groups';
 import { Litters } from '../../Litters';
 import { Schedules, type PlanOptions } from '../../Schedules';
@@ -158,7 +159,7 @@ export default function index(v: ViewContext, { heading = null, anthros, listed,
                                 <span class="form-label small d-block">Plan a day</span>
                                 <div class="d-flex flex-wrap gap-2 mb-2">
                                     <input class="form-control form-control-sm w-auto" type="date" name="plan_date" aria-label="Day"
-                                           min="${gmdate('Y-m-d')}" max="${gmdate('Y-m-d', strtotimeOrThrow('+' + Schedules.PLAN_AHEAD_DAYS + ' days'))}">
+                                           min="${Clock.today()}" max="${Clock.today(Schedules.PLAN_AHEAD_DAYS)}">
                                     ${planFields(v, { plan: { activity: 'work' }, options: planOptions,
                                         names: ['plan_activity', 'plan_detail'] })}
                                 </div>

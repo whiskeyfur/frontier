@@ -1,9 +1,10 @@
 // Upstream: tests/Game/AppTest.php (access, the menus and admin panel, and pages not covered by the other files)
 import { describe, expect, test } from 'vitest';
-import { gmdate, range, strtotimeOrThrow } from '../../../src/core/php';
+import { gmdate, range } from '../../../src/core/php';
 import { Anthros } from '../../../src/game/Anthros';
 import { App } from '../../../src/game/App';
 import { Auctions } from '../../../src/game/Auctions';
+import { Clock } from '../../../src/game/Clock';
 import { Goods } from '../../../src/game/Goods';
 import { Preferences } from '../../../src/game/Preferences';
 import { flash, get, post, request } from '../../AppHarness';
@@ -182,6 +183,9 @@ describe('App: general', () => {
         const boss = admin();
         const page = get('/game/admin/names', boss);
         expect(page, 'The Admin button opens the panel.').toContain('data-bs-target="#admin-panel"');
+        const button = page.indexOf('data-bs-target="#admin-panel"');
+        expect(button, 'At the right, after the app menu...').toBeGreaterThan(page.indexOf('navbar-brand'));
+        expect(button, '...just before the bell.').toBeLessThan(page.indexOf('title="Notifications"'));
         // (Upstream's panel also links the site's admin index, /admin, which isn't here.)
         for (const href of Object.keys(App.ADMIN_PAGES)) {
             expect(page, `${href} is in the panel.`).toContain('list-group-item-action" href="' + href + '"');
@@ -369,8 +373,8 @@ describe('App: general', () => {
         expect(get('/game/docs/changes', admin())).toContain('Admins speak for anthros');
         expect(page, 'Under Docs in the game menu.').toMatch(/class="dropdown-item active" href="\/game\/docs\/changes"/);
         expect(request('GET', '/game/changes', {}, alice)[1], 'Its old address.').toBe('/game/docs/changes');
-        expect(page).toContain('The day turns over at 00:00 UTC.');
-        expect(page).toContain('Next: ' + gmdate('Y-m-d', strtotimeOrThrow('tomorrow')) + ' 00:00 UTC');
+        expect(page, "The game's date (the test clock starts today).").toContain("<strong>It's " + gmdate('l, j F Y') + '</strong> in the game');
+        expect(page).toContain('1 game day for each real day');
     });
 
     test('pages within a section show its bar', () => {
@@ -386,6 +390,29 @@ describe('App: general', () => {
         const barony = get('/game/court/lands/' + baronyId(), alice);
         expect(barony).toMatch(/class="nav-link px-3 py-2 active" href="\/game\/court\/lands"/);
         expect(barony).not.toMatch(/class="nav-link px-3 py-2 active" href="\/game\/court"/);
+    });
+
+    test('the clock and paces on a section\'s bar', () => {
+        const alice = player('alice');
+        playerAnthro(alice);
+        const bob = player('bobby');
+        playerAnthro(bob);
+        Preferences.setTimeRate(bob, '2');
+        Clock.start('1200-01-01');
+        let page = get('/game/assets', alice);
+        expect(page, "The game's time (before 1970), and its pace.").toMatch(/data-game-clock="-\d+" data-game-rate="2"/);
+        expect(page, 'To the second.').toMatch(/>Sat 1 Jan 1200, 00:00:\d\d<\/div>/);
+        expect(page, 'In effect: solid, pulsing.').toMatch(/class="btn btn-sm py-0 px-2 btn-primary pace-effective"\s+name="time_rate" value="2"/);
+        expect(page, 'The rest: outlined.').toMatch(/class="btn btn-sm py-0 px-2 btn-outline-secondary"\s+name="time_rate" value="7"/);
+
+        // Asking for 7: bob's 2 is still the slowest.
+        const [, location] = request('POST', '/game/pace', { time_rate: '7', back: '/game/assets' }, alice);
+        expect(location).toBe('/game/assets');
+        page = get('/game/assets', alice);
+        expect(page, 'Asked for: solid, and clicked again, no longer asked.').toMatch(/class="btn btn-sm py-0 px-2 btn-primary"\s+name="time_rate" value=""/);
+        expect(Preferences.timeRate(alice.id)).toBe(7.0);
+        request('POST', '/game/pace', { time_rate: '', back: 'https://example.com/' }, alice);
+        expect(Preferences.timeRate(alice.id)).toBeNull();
     });
 
     test('knowledge base', () => {

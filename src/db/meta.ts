@@ -54,6 +54,7 @@ export const COLUMNS: Record<string, Record<string, string>> = {
         "tax_balance": "decimal",
         "tax_overdue_since": "date",
         "trade_occupation_id": "int",
+        "trade_recipe_id": "int",
         "seeking_occupation_id": "int",
         "hungry_on": "date",
         "standard_schedule_id": "int"
@@ -264,7 +265,8 @@ export const COLUMNS: Record<string, Record<string, string>> = {
     },
     "game_preferences": {
         "user_id": "int",
-        "era": "varchar"
+        "era": "varchar",
+        "time_rate": "decimal"
     },
     "game_proposals": {
         "id": "int",
@@ -449,6 +451,12 @@ export const FOREIGN_KEYS: ForeignKey[] = [
         "table": "game_anthros",
         "column": "standard_schedule_id",
         "references": "game_standard_schedules",
+        "referencedColumn": "id"
+    },
+    {
+        "table": "game_anthros",
+        "column": "trade_recipe_id",
+        "references": "game_recipes",
         "referencedColumn": "id"
     },
     {

@@ -1,10 +1,13 @@
 // Upstream: game/views/home/details.blade.php
 import { html, json, selected, type Html } from '../../../core/html';
 import type { InputArray } from '../../../core/http';
-import { empty, gmdate, int, strtotimeOrThrow } from '../../../core/php';
+import { empty, int } from '../../../core/php';
 import type { ViewContext } from '../../../core/View';
 import type { Row } from '../../../db/Db';
 import { Anthros } from '../../Anthros';
+import { Clock } from '../../Clock';
+import { Preferences } from '../../Preferences';
+import { Schedules } from '../../Schedules';
 import { Species } from '../../Species';
 import nameInput from '../assets/name-input';
 
@@ -48,10 +51,24 @@ export default function details(v: ViewContext, { prefix, player, form, genders,
         <div class="col-sm-6">
             <label class="form-label small" for="${prefix}birthdate">Birthdate <span class="text-body-secondary">(optional)</span></label>
             <input class="form-control" id="${prefix}birthdate" name="birthdate" type="date" value="${form.birthdate}"
-                   min="${gmdate('Y-m-d', strtotimeOrThrow('-' + (Anthros.LIFESPAN_MIN * 7 - 1) + ' days'))}" max="${gmdate('Y-m-d')}">
+                   min="${Clock.today(-(Anthros.LIFESPAN_MIN * 7 - 1))}" max="${Clock.today()}">
             ${!player ? html`
                 <div class="form-text">Leave it empty to start just grown: fertile from today.</div>` : ''}
         </div>
+        ${!player ? html`
+            ${/* A skill to start with, as a Journeyman: its occupations can be worked at once (see Schedules::START_PRACTICE). */ ''}
+            <div class="col-sm-6">
+                <label class="form-label small" for="${prefix}skill_id">Your skill <span class="text-body-secondary">(optional)</span></label>
+                <select class="form-select" id="${prefix}skill_id" name="skill_id">
+                    <option value="">None yet</option>
+                    ${[...Schedules.skills(Preferences.era(v.user!.id))].map(([skillId, skillName]) => {
+                        const titles = [...Schedules.occupations(Preferences.era(v.user!.id)).values()].filter((o) => int(o.skill_id) === skillId).map((o) => o.title);
+                        return html`
+                        <option value="${skillId}" ${selected(int(post.skill_id ?? 0) === skillId)}>${skillName}${titles.length ? ' (' + titles.join(', ') + ')' : ''}</option>`;
+                    })}
+                </select>
+                <div class="form-text">You start as a Journeyman at it, so you can work at its trades at once.</div>
+            </div>` : ''}
     </div>
     ${!player && !empty(gameEmpty) ? html`
         ${/* The game's very first anthro can start with a slave to breed with (Anthros.createStarterSlave). */ ''}

@@ -4,6 +4,7 @@ import { int } from '../core/php';
 import type { Row } from '../db/Db';
 import { Anthros } from './Anthros';
 import { Auctions } from './Auctions';
+import { Clock } from './Clock';
 import { Goods } from './Goods';
 import { Groups } from './Groups';
 import { Jobs } from './Jobs';
@@ -29,7 +30,7 @@ export class Aging {
         const ids = Auth.db().column(
             `SELECT id FROM game_anthros
              WHERE died_at IS NULL AND birthdate IS NOT NULL AND lifespan_weeks IS NOT NULL
-               AND ADDDATE(birthdate, lifespan_weeks * 7) <= UTC_DATE()
+               AND ADDDATE(birthdate, lifespan_weeks * 7) <= ` + Clock.sqlToday() + `
              ORDER BY birthdate, id`,
         );
         let died = 0;
@@ -131,7 +132,7 @@ export class Aging {
 
             // What's left: the dead own themselves, hold nothing, and nobody plays them.
             db.run(
-                `UPDATE game_anthros SET died_at = UTC_TIMESTAMP(), owner_id = id, player_id = NULL, liege_id = NULL,
+                `UPDATE game_anthros SET died_at = ` + Clock.sqlNow() + `, owner_id = id, player_id = NULL, liege_id = NULL,
                         title_rank = NULL, title_since = NULL, wage = NULL, debt = NULL, debt_rate = 0, debt_since = NULL
                  WHERE id = ?`,
                 [anthro.id],

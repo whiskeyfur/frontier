@@ -947,3 +947,7 @@ INSERT INTO `game_recipe_goods` VALUES (44,'flax',3,'in');
 INSERT INTO `game_recipe_goods` VALUES (44,'cloth',1,'out');
 INSERT INTO `game_recipe_goods` VALUES (45,'lumber',1,'in');
 INSERT INTO `game_recipe_goods` VALUES (45,'wheels',1,'out');
+INSERT INTO `game_settings` VALUES ('clock_day','1199-12-31');
+INSERT INTO `game_settings` VALUES ('clock_game','-24298795786');
+INSERT INTO `game_settings` VALUES ('clock_rate','1');
+INSERT INTO `game_settings` VALUES ('clock_real','1790461814');

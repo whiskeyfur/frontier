@@ -1,8 +1,9 @@
 // Upstream: tests/Game/AnthrosTest.php
 import { describe, expect, test } from 'vitest';
-import { array_sum, gmdate, strtotimeOrThrow, time } from '../../src/core/php';
+import { array_sum, gmdate, strtotimeOrThrow } from '../../src/core/php';
 import { Anthros } from '../../src/game/Anthros';
 import { Auctions } from '../../src/game/Auctions';
+import { Clock } from '../../src/game/Clock';
 import { Litters } from '../../src/game/Litters';
 import { Ranks } from '../../src/game/Ranks';
 import {
@@ -604,8 +605,8 @@ describe('Anthros', () => {
         expect(Anthros.setDebt(slave, '10', -1)).toBe("The daily increase can't be negative.");
         expect(Anthros.setDebt(slave, '300', 10)).toBeNull();
         expect(Number(refresh(slave).debt)).toBe(300);
-        // Upstream: debt_since = UTC_TIMESTAMP() - INTERVAL 3 DAY - INTERVAL 2 HOUR.
-        db().run('UPDATE game_anthros SET debt_since = ? WHERE id = ?', [gmdate('Y-m-d H:i:s', time() - 3 * 86400 - 2 * 3600), slave.id]);
+        // Upstream: debt_since = ? - INTERVAL 3 DAY - INTERVAL 2 HOUR, with Clock::now().
+        db().run('UPDATE game_anthros SET debt_since = ? WHERE id = ?', [gmdate('Y-m-d H:i:s', Clock.parse(Clock.now()) - 3 * 86400 - 2 * 3600), slave.id]);
         expect(Number(refresh(slave).debt)).toBe(330);
         expect(notificationsFor(slave.id)[0].startsWith('Your owner set your debt to 300 coins')).toBe(true);
         expect(Anthros.setDebt(slave, '', 0)).toBeNull();

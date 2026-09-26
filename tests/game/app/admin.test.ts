@@ -2,6 +2,7 @@
 import { describe, expect, test } from 'vitest';
 import { Anthros } from '../../../src/game/Anthros';
 import { Auctions } from '../../../src/game/Auctions';
+import { Clock } from '../../../src/game/Clock';
 import { Ranks } from '../../../src/game/Ranks';
 import { Saves } from '../../../src/game/Saves';
 import { Wallets } from '../../../src/game/Wallets';
@@ -105,7 +106,8 @@ describe('App: admin', () => {
         expect(get('/game/admin/time', boss)).toContain('Advance 1 week');
         post('/game/admin/time', { days: 7, save_first: '1' }, boss);
         expect(flash()).toBe('The game moved 7 days ahead.');
-        expect(refresh(me).birthdate).toBe(gmdate('Y-m-d', strtotimeOrThrow(me.birthdate + ' UTC -7 days')));
+        expect(refresh(me).birthdate, 'Dates stay: the calendar moves on.').toBe(me.birthdate);
+        expect(Clock.today()).toBe(gmdate('Y-m-d', strtotimeOrThrow('+7 days')));
         expect(Saves.all().map((s) => s.name)).toContain('Before advancing 7 days');
         const [status] = request('POST', '/game/admin/time', { days: 1 }, alice);
         expect(status).toBe(404);
@@ -138,7 +140,11 @@ describe('App: admin', () => {
         expect(location).toBeNull();
         expect(page).toContain('Type RESET to confirm.');
         post('/game/admin/reset-game', { confirm: 'RESET', save_first: '1' }, boss);
-        expect(Number(scalar('SELECT COUNT(*) FROM game_anthros')), 'The game starts empty.').toBe(0);
+        expect(Number(scalar('SELECT COUNT(*) FROM game_anthros')), 'The game starts with its commoners, and no one else.').toBe(Ranks.MIN_COMMONERS);
+        // A player choosing whom to become sees their jobs.
+        const home = get('/game/home', player('newcomer'));
+        expect(home).toContain('<th>Job</th>');
+        expect(home).toMatch(/<td>[A-Z][a-z -]+ \([A-Za-z ]+: Journeyman\)<\/td>/);
         expect(Saves.all().map((s) => s.name)).toContain('Before reset');
         expect(get('/game/admin/reset-game', boss)).toContain('name="ranks[9]"');
         post('/game/admin/reset-game', { confirm: 'RESET', ranks: { 4: 1, 3: 2 }, settle: '1' }, boss);

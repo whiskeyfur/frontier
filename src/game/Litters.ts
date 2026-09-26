@@ -4,6 +4,7 @@ import { empty, gmdate, int, random_int, strtotimeOrThrow } from '../core/php';
 import type { Row } from '../db/Db';
 import { Anthros } from './Anthros';
 import { Baronies } from './Baronies';
+import { Clock } from './Clock';
 import { Genders } from './Genders';
 import { Names } from './Names';
 import { Notifications } from './Notifications';
@@ -56,7 +57,7 @@ export class Litters {
             if (pending) {
                 litterId = pending.id;
             } else {
-                const today = gmdate('Y-m-d');
+                const today = Clock.today();
                 const due = gmdate('Y-m-d', strtotimeOrThrow(today + ' +' + Litters.GESTATION_DAYS + ' days'));
                 db.run('INSERT INTO game_litters (dam_id, bred_on, due_on) VALUES (?, ?, ?)', [dam.id, today, due]);
                 litterId = db.lastInsertId();
@@ -113,7 +114,7 @@ export class Litters {
     static deliverDue(): number {
         const db = Auth.db();
         const due = db.all(
-            'SELECT id, dam_id, due_on FROM game_litters WHERE born_at IS NULL AND due_on <= UTC_DATE() ORDER BY id',
+            'SELECT id, dam_id, due_on FROM game_litters WHERE born_at IS NULL AND due_on <= ' + Clock.sqlToday() + ' ORDER BY id',
         );
         let born = 0;
         for (const litter of due) {
@@ -130,8 +131,8 @@ export class Litters {
         if (!litter) {
             return 'She isn\'t expecting a litter.';
         }
-        Auth.db().run('UPDATE game_litters SET due_on = UTC_DATE() WHERE id = ?', [litter.id]);
-        return Litters.deliver({ id: litter.id, dam_id: damId, due_on: gmdate('Y-m-d') }) ? null : 'No cubs came of it.';
+        Auth.db().run('UPDATE game_litters SET due_on = ' + Clock.sqlToday() + ' WHERE id = ?', [litter.id]);
+        return Litters.deliver({ id: litter.id, dam_id: damId, due_on: Clock.today() }) ? null : 'No cubs came of it.';
     }
 
     /**
@@ -143,7 +144,7 @@ export class Litters {
         let born = 0;
         db.beginTransaction();
         // Claim the litter first, so two requests can't deliver it twice.
-        const claimed = db.run('UPDATE game_litters SET born_at = NOW() WHERE id = ? AND born_at IS NULL', [litter.id]);
+        const claimed = db.run('UPDATE game_litters SET born_at = ' + Clock.sqlNow() + ' WHERE id = ? AND born_at IS NULL', [litter.id]);
         if (claimed === 0) {
             db.rollBack();
             return 0;

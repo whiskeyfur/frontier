@@ -1,8 +1,7 @@
 // Upstream: game/src/Board.php
 import { Auth } from '../core/Auth';
-import { array_sum, ctype_digit, int, number_format, randomHex, str, trim } from '../core/php';
+import { array_sum, ctype_digit, gmdate, int, number_format, randomHex, str, strtotime, trim } from '../core/php';
 import type { Row } from '../db/Db';
-import { dateColumns } from '../db/meta';
 import { Aging } from './Aging';
 import { Anthros } from './Anthros';
 import { Auctions } from './Auctions';
@@ -43,15 +42,38 @@ export class Board {
     // The most days an admin can advance the game at once.
     static readonly MAX_ADVANCE = 365;
 
-    // Here, not upstream: how far (in days, about 2,700 years) Board.advance parks dates on their way back a day.
-    private static readonly PARKING_DAYS = 1000000;
-
     /**
-     * The day's business, due whenever the game is used (the game runs this on each request; each part only does what
-     * hasn't been done): litters born, the young grown up, the old dead, everyone fed, schedules carried out, auctions
-     * closed, wages paid (and anthros nobody plans doing their default days), dams' urges rolled, titles held by land kept to the land, lieges and holdings kept in order.
+     * The game's business for every game day that has passed since it was last done, in order (see Clock; at most
+     * Clock::MAX_CATCH_UP in one request), and then for today, as far as it's due: the game runs this on each request.
      */
     static runDaily(): void {
+        Clock.sync();
+        const today = Clock.today();
+        const done = Clock.doneThrough();
+        let day = done === null ? today : Clock.add(done, 1);
+        for (let n = 0; day < today && n < Clock.MAX_CATCH_UP; n++, day = Clock.add(day, 1)) {
+            Clock.processing(day);
+            try {
+                Board.runDay();
+                Clock.done(day);
+            } finally {
+                Clock.processing(null);
+            }
+        }
+        if (day === today) {
+            // Today's business, as far as it's due yet (each part does only what hasn't been done).
+            Board.runDay();
+            Clock.done(Clock.add(today, -1));
+        }
+    }
+
+    /**
+     * One day's business (the day Clock says is today; each part only does what hasn't been done): litters born, the
+     * young grown up, the old dead, everyone fed, schedules carried out, auctions closed, wages paid (and anthros nobody
+     * plans doing their default days), dams' urges rolled, titles held by land kept to the land, lieges and holdings kept
+     * in order.
+     */
+    private static runDay(): void {
         Litters.deliverDue();
         Anthros.comeOfAge();
         Aging.buryDue();
@@ -137,44 +159,15 @@ export class Board {
     }
 
     /**
-     * Admin: moves the game $days days ahead, a day at a time: every date and time in the game's state moves a day
-     * earlier (so today is a day later, as far as the game can tell), and then that day's business is done (see
-     * runDaily). Saved games and site accounts aren't touched. Returns an error message, or null.
+     * Admin: moves the game $days days ahead: the clock moves on, and each day's business is done in turn (see
+     * runDaily). Returns an error message, or null.
      */
     static advance(admin: Row, days: number): string | null {
         if (days < 1 || days > Board.MAX_ADVANCE) {
             return 'Advance the game 1 to ' + Board.MAX_ADVANCE + ' days.';
         }
-        const db = Auth.db();
-        // Upstream reads these from information_schema (in table name order).
-        const columns = new Map<string, string[]>();
-        for (const table of [...Board.TABLES].sort()) {
-            const names = dateColumns(table);
-            if (names.length) {
-                columns.set(table, names);
-            }
-        }
-        for (let day = 0; day < days; day++) {
-            db.beginTransaction();
-            for (const [table, names] of columns) {
-                // A day that's part of a row's key moves oldest first, so no two rows share one on the way. (Upstream:
-                // UPDATE ... ORDER BY `day`. SQLite has no ORDER BY on UPDATE and checks keys row by row, so those
-                // tables' dates go far into the future first, where no row has one, and then come back a day earlier.)
-                if (names.includes('day')) {
-                    const park = names.map((c) => `\`${c}\` = ADDDATE(\`${c}\`, ${Board.PARKING_DAYS})`).join(', ');
-                    db.exec(`UPDATE \`${table}\` SET ${park}`);
-                    const back = names.map((c) => `\`${c}\` = SUBDATE(\`${c}\`, ${Board.PARKING_DAYS + 1})`).join(', ');
-                    db.exec(`UPDATE \`${table}\` SET ${back}`);
-                    continue;
-                }
-                const set = names.map((c) => `\`${c}\` = SUBDATE(\`${c}\`, 1)`).join(', ');
-                db.exec(`UPDATE \`${table}\` SET ${set}`);
-            }
-            // Today is the next day of the game: its weekday moves on too.
-            Clock.advance();
-            db.commit();
-            Board.runDaily();
-        }
+        Clock.advance(days);
+        Board.runDaily();
         Notifications.toAdmins(`${admin.username} moved the game ${days} ` + (days === 1 ? 'day' : 'days') + ' ahead.', '/game/admin/time');
         return null;
     }
@@ -193,15 +186,26 @@ export class Board {
     /**
      * Deletes all game state in one transaction, then seats the court asked for ($counts = [rank => how many], King
      * down to knight; the King with a Queen consort if $consort; see Ranks::createRanks), with its baronies, settlements
-     * and commoners if $settle, and tells the admins who did it. The site's database account can only change rows (not
-     * TRUNCATE), so ids carry on from where they were. Returns an error message, or null.
+     * and commoners if $settle, the game's clock starting on $start ('Y-m-d': see Clock), and at least $places
+     * ['commoners' => how many (see Ranks::fillCommoners), 'village'/'town'/'city' => how many (see
+     * Baronies::addSettlements)], and tells the admins who did it.
+     * The site's database account can only change rows (not TRUNCATE), so ids carry on from where they were. Returns an
+     * error message, or null.
      *
      * counts: rank => how many (form values: strings or numbers). Here the ids carry on too: the tables are
      * AUTOINCREMENT, so SQLite never reuses an id, even after DELETE.
      */
-    static reset(admin: Row, confirm: string, counts: Record<number, unknown> = {}, consort = true, settle = true): string | null {
+    // The most villages, towns or cities a reset founds of each kind.
+    static readonly MAX_SETTLEMENTS = 200;
+
+    static reset(admin: Row, confirm: string, counts: Record<number, unknown> = {}, consort = true, settle = true,
+                 start: string = Clock.START, places: Record<string, unknown> = {}): string | null {
         if (confirm !== Board.CONFIRM_WORD) {
             return 'Type ' + Board.CONFIRM_WORD + ' to confirm.';
+        }
+        const parsed = /^\d{4}-\d{2}-\d{2}$/.test(start) ? strtotime(start + ' UTC') : false;
+        if (parsed === false || gmdate('Y-m-d', parsed) !== start || start < '1000-01-01') {
+            return 'Start the game on a date (year 1000 or later), like ' + Clock.START + '.';
         }
         // rank => how many, King first.
         const wanted = new Map<number, number>();
@@ -213,6 +217,19 @@ export class Board {
             }
             wanted.set(rank, int(count));
         }
+        const want: Record<string, number> = { commoners: Ranks.MIN_COMMONERS };
+        const ranges: [string, number, number][] = [['commoners', Ranks.MIN_COMMONERS, Ranks.MAX_COMMONERS], ['village', 0, Board.MAX_SETTLEMENTS],
+            ['town', 0, Board.MAX_SETTLEMENTS], ['city', 0, Board.MAX_SETTLEMENTS]];
+        for (const [what, min, max] of ranges) {
+            const value = trim(str(places[what] ?? ''));
+            if (value === '') {
+                continue;
+            }
+            if (!ctype_digit(value) || int(value) < min || int(value) > max) {
+                return ({ commoners: 'Commoners', village: 'Villages', town: 'Towns', city: 'Cities' } as Record<string, string>)[what] + `: ${min} to ` + number_format(max) + '.';
+            }
+            want[what] = int(value);
+        }
         const anthros = Board.counts().game_anthros;
         const db = Auth.db();
         db.beginTransaction();
@@ -222,6 +239,7 @@ export class Board {
             db.exec(`DELETE FROM ${table}`);
         }
         Clock.forget();
+        Clock.start(start);
         // The court asked for, if any: its baronies and settlements, and its commoners (see Ranks::createCommoners).
         const court = array_sum(wanted.values()) ? Ranks.createRanks(wanted, consort) : 0;
         let commoners = 0;
@@ -236,13 +254,19 @@ export class Board {
             const [, acres] = Baronies.foundEmpty(db);
             barony = number_format(acres) + ' acres';
         }
+        // The villages, towns and cities asked for; and the commoners (at least Ranks::MIN_COMMONERS, more if they came
+        // with the court), every trade among them.
+        const founded = Baronies.addSettlements(want, db);
+        commoners += Ranks.fillCommoners(want.commoners);
+        Schedules.spreadTrades();
         db.commit();
         if (court) {
             Ranks.assignLieges();
         }
-        Notifications.toAdmins(`${admin.username} reset the game, removing ${anthros} ` + (anthros === 1 ? 'anthro' : 'anthros') + (court
-            ? `, and seated a court of ${court} title holders` + (commoners ? ` and ${commoners} commoners.` : '.')
-            : '. The game is empty: the first player to create an anthro can start with a slave to breed with.')
+        Notifications.toAdmins(`${admin.username} reset the game (starting on ${start}), removing ${anthros} ` + (anthros === 1 ? 'anthro' : 'anthros') + (court
+            ? `, and seated a court of ${court} title holders and ${commoners} commoners.`
+            : `, and seated ${commoners} commoners, with no court.`)
+            + ' Every trade is someone\'s.' + (founded ? ` ${founded} more ` + (founded === 1 ? 'settlement was' : 'settlements were') + ' founded.' : '')
             + (barony ? ` An empty barony of ${barony} awaits a holder.` : ''), '/game/home');
         return null;
     }

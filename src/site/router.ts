@@ -23,6 +23,8 @@ export const MAX_USERNAME = 32;
 export function route(request: Request): Response {
     // Each PHP request starts with no static caches (Ranks, Clock, Market...): so does each request here.
     resetCaches();
+    // ...and a new database connection, without the last one's user variables (see Clock.bind).
+    Auth.db().clearVariables();
     const users = Auth.allUsers();
     const path = request.path || '/';
 

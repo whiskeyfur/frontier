@@ -13,6 +13,8 @@
  *     $stmt->rowCount() / $db->exec($sql)                   db.run(sql, params)          (rows changed)
  *   $db->lastInsertId()                                     db.lastInsertId()
  *   beginTransaction / commit / rollBack / inTransaction    the same names
+ *   $db->exec("SET @name = 'value'")                        db.setVariable('name', value)
+ *   @name (a user variable, in SQL and triggers)           VARIABLE('name')
  *
  * Parameters: an array for ? placeholders, or an object for :name placeholders (keys without the colon).
  * Booleans are bound as 1/0 and undefined as NULL. Rows are plain objects (column => value).
@@ -37,6 +39,8 @@ export class DbError extends Error {
 export class Db {
     private statements = new Map<string, Statement>();
     private depth = 0;
+    // The connection's user variables (MariaDB's @name), read in SQL with VARIABLE('name').
+    private variables = new Map<string, SqlValue>();
 
     constructor(public raw: Database) {
         this.configure();
@@ -45,7 +49,17 @@ export class Db {
     /** Settings and functions a connection needs (again after export, which reopens it). */
     private configure(): void {
         this.raw.run('PRAGMA foreign_keys = ON');
-        registerFunctions(this.raw);
+        registerFunctions(this.raw, (name) => this.variables.get(name) ?? null);
+    }
+
+    /** MariaDB's SET @name = value: a user variable, for this connection, that SQL reads as VARIABLE('name'). */
+    setVariable(name: string, value: string | number | null): void {
+        this.variables.set(name, value);
+    }
+
+    /** Forgets every user variable (each PHP request had a new connection, without them: see router). */
+    clearVariables(): void {
+        this.variables.clear();
     }
 
     private statement(sql: string, params?: Params): Statement {

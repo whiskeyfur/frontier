@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest';
 import { Auth } from '../../src/core/Auth';
 import { Anthros } from '../../src/game/Anthros';
 import { Board } from '../../src/game/Board';
+import { Ranks } from '../../src/game/Ranks';
 import { Saves } from '../../src/game/Saves';
 import { admin, anthro, coins, db, notificationsForUser, player, playerAnthro, refresh, scalar, setCoins } from '../TestCase';
 
@@ -54,7 +55,7 @@ describe('Saves', () => {
         // The game as it was is saved first.
         expect(Saves.all().map((s) => s.name)).toEqual(['Before restoring "Checkpoint"', 'Checkpoint']);
         const before = JSON.parse(Saves.json(Saves.find(Number(Saves.all()[0].id))!));
-        expect(before.tables.game_anthros).toEqual([]); // That was the empty game after the reset.
+        expect(before.tables.game_anthros).toHaveLength(Ranks.MIN_COMMONERS); // That was the new game after the reset: its commoners.
         expect(notificationsForUser(boss.id)[0].startsWith('boss restored the saved game "Checkpoint"')).toBe(true);
     });
 

@@ -3,6 +3,7 @@ import { Auth } from '../core/Auth';
 import { array_unique, int, random_int, shuffle } from '../core/php';
 import type { Db, Row } from '../db/Db';
 import { Anthros } from './Anthros';
+import { Clock } from './Clock';
 import { Litters } from './Litters';
 import { Notifications } from './Notifications';
 import { Preferences } from './Preferences';
@@ -64,7 +65,7 @@ export class Urges {
      */
     static daysWaiting(anthro: Row): number {
         const days = Auth.db().value(
-            `SELECT DATEDIFF(UTC_DATE(), GREATEST(
+            `SELECT DATEDIFF(` + Clock.sqlToday() + `, GREATEST(
                  COALESCE((SELECT MAX(DATE(b.bred_at)) FROM game_breedings b WHERE b.sire_id = a.id OR b.dam_id = a.id), '1000-01-01'),
                  COALESCE((SELECT MAX(DATE(l.born_at)) FROM game_litters l WHERE l.dam_id = a.id), '1000-01-01'),
                  COALESCE(a.fertile_on, '1000-01-01'),
@@ -170,7 +171,7 @@ export class Urges {
      */
     static rollToday(): number {
         const db = Auth.db();
-        const claim = db.run("INSERT OR IGNORE INTO game_daily (day, task) VALUES (UTC_DATE(), 'urges')");
+        const claim = db.run('INSERT OR IGNORE INTO game_daily (day, task) VALUES (' + Clock.sqlToday() + ", 'urges')");
         if (!claim) {
             return 0;
         }

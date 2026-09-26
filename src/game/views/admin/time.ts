@@ -1,10 +1,9 @@
 // Upstream: game/views/admin/time.blade.php
 import { html, type Html } from '../../../core/html';
-import { json_encode, number_format } from '../../../core/php';
+import { json_encode } from '../../../core/php';
 import type { ViewContext } from '../../../core/View';
-import { Anthros } from '../../Anthros';
 import { Board } from '../../Board';
-import { Clock } from '../../Clock';
+import clock from '../clock';
 import gameLayout from '../layouts/game';
 
 export default function time(v: ViewContext, { error }: { error: string | null }): Html {
@@ -14,16 +13,12 @@ export default function time(v: ViewContext, { error }: { error: string | null }
     <div class="mx-auto" style="max-width: 40rem">
         <h1 class="h3 mb-1">Advance time</h1>
         <p class="text-body-secondary">
-            Moves the game ahead, a day at a time: every date in the game (births, due dates, schedules, auctions, wages,
-            notifications...) moves a day earlier, and then that day's business happens, just as if a day had passed:
-            litters are born, the young grow up, the old die, everyone eats, schedules are carried out, auctions close
-            and wages are paid. Saved games and site accounts aren't touched. Each day advanced is the next day of the week
-            in the game, for routines, dams' conceiving days and the tax day.
+            Moves the game's clock ahead (see <a href="/game/docs/knowledge-base#time-and-the-day">the Knowledge Base</a>):
+            each day's business then happens in turn, just as if the days had passed: litters are born, the young grow up,
+            the old die, everyone eats, schedules are carried out, taxes are assessed and wages paid. Auctions keep real
+            time. Saved games and site accounts aren't touched.
         </p>
-        <p class="small">
-            The game has moved ${number_format(Clock.daysAdvanced())} ${Clock.daysAdvanced() === 1 ? 'day' : 'days'} ahead:
-            today is a <strong>${Anthros.weekday(Clock.weekday())}</strong> in the game.
-        </p>
+        ${clock(v)}
         ${error ? html`
             <div class="alert alert-danger">${error}</div>` : ''}
         <form method="post" action="/game/admin/time" class="card card-body">

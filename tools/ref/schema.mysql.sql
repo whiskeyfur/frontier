@@ -52,6 +52,7 @@ CREATE TABLE `game_anthros` (
   `tax_balance` decimal(12,2) NOT NULL DEFAULT 0.00,
   `tax_overdue_since` date DEFAULT NULL,
   `trade_occupation_id` int(10) unsigned DEFAULT NULL,
+  `trade_recipe_id` int(10) unsigned DEFAULT NULL,
   `seeking_occupation_id` int(10) unsigned DEFAULT NULL,
   `hungry_on` date DEFAULT NULL,
   `standard_schedule_id` int(10) unsigned DEFAULT NULL,
@@ -70,13 +71,15 @@ CREATE TABLE `game_anthros` (
   KEY `trade_occupation_id` (`trade_occupation_id`),
   KEY `seeking_occupation_id` (`seeking_occupation_id`),
   KEY `standard_schedule_id` (`standard_schedule_id`),
+  KEY `trade_recipe_id` (`trade_recipe_id`),
   CONSTRAINT `game_anthros_ibfk_10` FOREIGN KEY (`breeding_id`) REFERENCES `game_breedings` (`id`) ON DELETE SET NULL,
   CONSTRAINT `game_anthros_ibfk_11` FOREIGN KEY (`spouse_of`) REFERENCES `game_anthros` (`id`) ON DELETE SET NULL,
   CONSTRAINT `game_anthros_ibfk_12` FOREIGN KEY (`trade_occupation_id`) REFERENCES `game_occupations` (`id`) ON DELETE SET NULL,
   CONSTRAINT `game_anthros_ibfk_13` FOREIGN KEY (`seeking_occupation_id`) REFERENCES `game_occupations` (`id`) ON DELETE SET NULL,
   CONSTRAINT `game_anthros_ibfk_14` FOREIGN KEY (`standard_schedule_id`) REFERENCES `game_standard_schedules` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `game_anthros_ibfk_15` FOREIGN KEY (`owner_id`) REFERENCES `game_anthros` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `game_anthros_ibfk_16` FOREIGN KEY (`employer_id`) REFERENCES `game_anthros` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `game_anthros_ibfk_15` FOREIGN KEY (`trade_recipe_id`) REFERENCES `game_recipes` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `game_anthros_ibfk_16` FOREIGN KEY (`owner_id`) REFERENCES `game_anthros` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `game_anthros_ibfk_17` FOREIGN KEY (`employer_id`) REFERENCES `game_anthros` (`id`) ON DELETE SET NULL,
   CONSTRAINT `game_anthros_ibfk_2` FOREIGN KEY (`gender_id`) REFERENCES `game_genders` (`id`),
   CONSTRAINT `game_anthros_ibfk_3` FOREIGN KEY (`species_id`) REFERENCES `game_species` (`id`),
   CONSTRAINT `game_anthros_ibfk_4` FOREIGN KEY (`sire_id`) REFERENCES `game_anthros` (`id`) ON DELETE SET NULL,
@@ -151,6 +154,22 @@ DELIMITER ;;
                      SET NEW.lifespan_weeks = shortest + FLOOR(RAND() * (GREATEST(80, shortest) - shortest + 1));
                  END IF;
              END */;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = utf8mb4 */ ;
+/*!50003 SET character_set_results = utf8mb4 */ ;
+/*!50003 SET collation_connection  = utf8mb4_general_ci */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = 'STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION' */ ;
+DELIMITER ;;
+/*!50003 CREATE*/ /*!50017 DEFINER=`whiskey`@`localhost`*/ /*!50003 TRIGGER game_anthros_game_time BEFORE INSERT ON game_anthros FOR EACH ROW
+                SET NEW.created_at = IF(@game_now IS NOT NULL AND NEW.created_at >= NOW() - INTERVAL 1 MINUTE, @game_now, NEW.created_at) */;;
 DELIMITER ;
 /*!50003 SET sql_mode              = @saved_sql_mode */ ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
@@ -313,6 +332,22 @@ CREATE TABLE `game_breedings` (
   CONSTRAINT `game_breedings_ibfk_5` FOREIGN KEY (`owner_id`) REFERENCES `game_anthros` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = utf8mb4 */ ;
+/*!50003 SET character_set_results = utf8mb4 */ ;
+/*!50003 SET collation_connection  = utf8mb4_general_ci */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = 'STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION' */ ;
+DELIMITER ;;
+/*!50003 CREATE*/ /*!50017 DEFINER=`whiskey`@`localhost`*/ /*!50003 TRIGGER game_breedings_game_time BEFORE INSERT ON game_breedings FOR EACH ROW
+                SET NEW.bred_at = IF(@game_now IS NOT NULL AND NEW.bred_at >= NOW() - INTERVAL 1 MINUTE, @game_now, NEW.bred_at) */;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `game_building_types` (
@@ -344,6 +379,22 @@ CREATE TABLE `game_buildings` (
   CONSTRAINT `game_buildings_ibfk_3` FOREIGN KEY (`started_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = utf8mb4 */ ;
+/*!50003 SET character_set_results = utf8mb4 */ ;
+/*!50003 SET collation_connection  = utf8mb4_general_ci */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = 'STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION' */ ;
+DELIMITER ;;
+/*!50003 CREATE*/ /*!50017 DEFINER=`whiskey`@`localhost`*/ /*!50003 TRIGGER game_buildings_game_time BEFORE INSERT ON game_buildings FOR EACH ROW
+                SET NEW.started_at = IF(@game_now IS NOT NULL AND NEW.started_at >= NOW() - INTERVAL 1 MINUTE, @game_now, NEW.started_at) */;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `game_daily` (
@@ -599,11 +650,28 @@ CREATE TABLE `game_parcels` (
   CONSTRAINT `game_parcels_ibfk_4` FOREIGN KEY (`held_of`) REFERENCES `game_anthros` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = utf8mb4 */ ;
+/*!50003 SET character_set_results = utf8mb4 */ ;
+/*!50003 SET collation_connection  = utf8mb4_general_ci */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = 'STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION' */ ;
+DELIMITER ;;
+/*!50003 CREATE*/ /*!50017 DEFINER=`whiskey`@`localhost`*/ /*!50003 TRIGGER game_parcels_game_time BEFORE INSERT ON game_parcels FOR EACH ROW
+                SET NEW.created_at = IF(@game_now IS NOT NULL AND NEW.created_at >= NOW() - INTERVAL 1 MINUTE, @game_now, NEW.created_at) */;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `game_preferences` (
   `user_id` int(10) unsigned NOT NULL,
   `era` varchar(20) NOT NULL DEFAULT 'dark',
+  `time_rate` decimal(6,2) DEFAULT NULL,
   PRIMARY KEY (`user_id`),
   CONSTRAINT `game_preferences_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

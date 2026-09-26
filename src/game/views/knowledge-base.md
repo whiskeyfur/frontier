@@ -15,14 +15,18 @@ How Frontier works: each of the game's systems, and how they fit together. For w
 ### Starting out
 - **Create an anthro:** a name (1–64 characters; the random-name button follows the gender you pick), a gender, a
   species and, optionally, a birthdate less than 52 weeks ago. With no birthdate it arrives just grown and fertile
-  from today. Afterwards only its name can change.
+  from today, and optionally **a skill**: it starts a Journeyman at it, so it can work its trades at once. Afterwards
+  only its name can change.
 - **Or become one:** any anthro nobody plays that isn't up for auction, dead, or a noble (Baron and up, or married to
   one). It keeps what it has, and its owner if it has one: you can become a slave. A **Become** button is on the
   anthro's page, and the game home lists them.
 - **The choice is permanent.** To play another anthro, **request a reset** from the game home (with a reason); an
   admin decides. The anthro you leave keeps everything.
-- **In an empty game**, the first player can also take a **starter slave** of their species and age, of the opposite
-  sex (a herm chooses one that sires or one that carries).
+- **A new game has people already:** at least 100 free commoners, each a Journeyman at a trade: first enough
+  farmers (with 10 acres each), fishers, hunters and swineherds to feed them all, then every other trade. The list of
+  anthros to become shows each one's job.
+- **In a game with nobody at all**, the first player can also take a **starter slave** of their species and age, of the
+  opposite sex (a herm chooses one that sires or one that carries).
 - **Every new anthro** (players', cubs, the game's) starts with **0–100 coins** and **7 food**.
 
 ### The game home
@@ -34,14 +38,23 @@ How Frontier works: each of the game's systems, and how they fit together. For w
 
 ## Time and the day
 
+### The game's calendar
+- **The game keeps its own calendar**, apart from ours. A new game starts on the date the admins choose
+  (**1 January 1200** unless they pick another).
+- **Its time runs at a pace:** so many game days for each real day, from **0.25** (a game day every four real days) to
+  **24** (a game day every real hour). Each player can ask for a pace under **Game → Preferences**; the game runs at
+  the **slowest pace anyone playing asks for**, or a game day each real day if nobody asks. A change of pace counts
+  from then on.
+- **The clock** runs at the right of each section's bar (on a wide screen), with the paces under it: the one the
+  game runs at is solid and pulsing, the one you ask for solid, the rest outlined. Click one to ask for it, and yours
+  again to stop asking. The Changes page also shows how long until the next game day in real time.
+
 ### The daily turnover
-- The game's day is the **UTC date**. It turns over at **00:00 UTC**, and the **first visit to the game after that**
-  runs the new day's business for everyone. The Changes page shows when the next turnover is.
-- **Plans made during the day take effect at the next turnover**, once the day's schedules have run.
-- **Days nobody visits are skipped.** Meals, work, default days, dams' urges, taxes and the daily report happen only
-  on days the game is visited; they aren't made up later. Births, coming of age, deaths, auctions ending and wages
-  do catch up.
-- **Maintenance:** while the game is down, nothing happens at all; no days go by.
+- **Each game day's business is done in turn,** for everyone at once, when the game is next visited: however many game
+  days have passed, every one of them happens, in order (up to a year's worth at a visit).
+- **Plans made during a game day take effect the next,** once that day's schedules have run.
+- **Auctions keep real time:** a 3-day auction lasts three real days, whatever the game's pace.
+- **Maintenance:** while the game is down, its clock stands still; no days go by.
 
 ### The order of the day
 1. **Births:** litters due are born.
@@ -60,8 +73,8 @@ How Frontier works: each of the game's systems, and how they fit together. For w
 Because meals come before work, an anthro that goes hungry is hungry for that whole day's work.
 
 ### The week
-- Weekly routines, each dam's conceiving day and the **Monday tax day** follow the game's weekday (the real one,
-  unless admins have advanced time).
+- Weekly routines, each dam's conceiving day and the **Monday tax day** follow the game's own weekdays (1 January
+  1200 was a Saturday).
 - Ages are in **weeks**.
 
 ## Anthros

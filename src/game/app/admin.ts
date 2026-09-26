@@ -13,6 +13,7 @@ import { Auctions } from '../Auctions';
 import { Baronies } from '../Baronies';
 import { Board } from '../Board';
 import { Buildings } from '../Buildings';
+import { Clock } from '../Clock';
 import { Crafts } from '../Crafts';
 import { Genders } from '../Genders';
 import { Jobs } from '../Jobs';
@@ -217,7 +218,8 @@ export function resetGame(app: App, user: User, post: boolean): void {
             [, error] = Saves.create(user, 'Before reset');
         }
         const counts = fieldArray(app.post, 'ranks');
-        error ??= Board.reset(user, confirm, counts, !empty(app.post.consort), !empty(app.post.settle));
+        error ??= Board.reset(user, confirm, counts, !empty(app.post.consort), !empty(app.post.settle), trim(field(app.post, 'start', Clock.START)),
+            fieldArray(app.post, 'places'));
         if (error === null) {
             // Upstream's statics (ranks, the clock...) were forgotten at the end of the request.
             resetCaches();

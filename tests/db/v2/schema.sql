@@ -57,7 +57,6 @@ CREATE TABLE game_anthros (
     tax_balance REAL NOT NULL DEFAULT 0.00,
     tax_overdue_since TEXT,
     trade_occupation_id INTEGER,
-    trade_recipe_id INTEGER,
     seeking_occupation_id INTEGER,
     hungry_on TEXT,
     standard_schedule_id INTEGER,
@@ -67,7 +66,6 @@ CREATE TABLE game_anthros (
     FOREIGN KEY (trade_occupation_id) REFERENCES game_occupations (id) ON DELETE SET NULL,
     FOREIGN KEY (seeking_occupation_id) REFERENCES game_occupations (id) ON DELETE SET NULL,
     FOREIGN KEY (standard_schedule_id) REFERENCES game_standard_schedules (id) ON DELETE SET NULL,
-    FOREIGN KEY (trade_recipe_id) REFERENCES game_recipes (id) ON DELETE SET NULL,
     FOREIGN KEY (owner_id) REFERENCES game_anthros (id) ON DELETE SET NULL,
     FOREIGN KEY (employer_id) REFERENCES game_anthros (id) ON DELETE SET NULL,
     FOREIGN KEY (gender_id) REFERENCES game_genders (id),
@@ -90,7 +88,6 @@ CREATE INDEX game_anthros__spouse_of ON game_anthros (spouse_of);
 CREATE INDEX game_anthros__trade_occupation_id ON game_anthros (trade_occupation_id);
 CREATE INDEX game_anthros__seeking_occupation_id ON game_anthros (seeking_occupation_id);
 CREATE INDEX game_anthros__standard_schedule_id ON game_anthros (standard_schedule_id);
-CREATE INDEX game_anthros__trade_recipe_id ON game_anthros (trade_recipe_id);
 
 CREATE TABLE game_auctions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -434,7 +431,6 @@ CREATE INDEX game_parcels__held_of ON game_parcels (held_of);
 CREATE TABLE game_preferences (
     user_id INTEGER NOT NULL,
     era TEXT COLLATE NOCASE NOT NULL DEFAULT 'dark',
-    time_rate REAL,
     PRIMARY KEY (user_id),
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );

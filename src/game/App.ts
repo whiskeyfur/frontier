@@ -355,16 +355,28 @@ export class App {
                 assets.groupAction(this, user, post);
                 break;
 
+            case '/game/pace': {
+                // The pace buttons by the clock (see game::clock-bar): ask for a pace, or (the one asked for) no longer.
+                if (post) {
+                    const error = Preferences.setTimeRate(user, field(this.post, 'time_rate'));
+                    Session.data.flash = error ?? (field(this.post, 'time_rate') === ''
+                        ? 'You no longer ask for a pace.' : 'You ask for ' + field(this.post, 'time_rate') + ' game days per real day.');
+                }
+                const back = field(this.post, 'back');
+                this.redirect(/^\/game\/[a-z0-9\/_-]*$/.test(back) ? back : '/game/home');
+            }
+
             case '/game/preferences': {
                 let error: string | null = null;
                 if (post) {
-                    error = Preferences.setEra(user, field(this.post, 'era'));
+                    error = Preferences.setEra(user, field(this.post, 'era'))
+                        ?? Preferences.setTimeRate(user, field(this.post, 'time_rate'));
                     if (error === null) {
                         Session.data.flash = 'Your preferences are saved.';
                         this.redirect('/game/preferences');
                     }
                 }
-                this.echo(this.render(preferencesView, user, { era: Preferences.era(user.id), error }));
+                this.echo(this.render(preferencesView, user, { era: Preferences.era(user.id), timeRate: Preferences.timeRate(user.id), error }));
                 break;
             }
 

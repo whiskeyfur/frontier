@@ -7,17 +7,20 @@ import schemaSql from './schema.sql?raw';
 import triggersSql from './triggers.sql?raw';
 import seedSql from './seed.sql?raw';
 import { Db } from './Db';
-import { MIGRATIONS } from './migrations';
+import { gmdate } from '../core/php';
+import { MIGRATIONS, toGameCalendar } from './migrations';
 
 /** The schema version a new database gets: one more than the number of migrations. */
 export const SCHEMA_VERSION = MIGRATIONS.length + 1;
 
-/** A new game database: every table, the triggers, and the configuration rows (species, genders, names...). */
+/** A new game database: every table, the triggers, the configuration rows (species, genders, names...) and the clock. */
 export function createDatabase(SQL: SqlJsStatic): Db {
     const db = new Db(new SQL.Database());
     db.exec(schemaSql);
     db.exec(triggersSql);
     db.exec(seedSql);
+    // The game's clock, started as upstream's migration starts a new database's (Schema::gameClock).
+    toGameCalendar(db, gmdate('Y-m-d'));
     db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
     return db;
 }

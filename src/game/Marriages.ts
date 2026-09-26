@@ -3,6 +3,7 @@ import { Auth, type User } from '../core/Auth';
 import { gmdate, int, random_int, strtotimeOrThrow } from '../core/php';
 import type { Row } from '../db/Db';
 import { Anthros } from './Anthros';
+import { Clock } from './Clock';
 import { Notifications } from './Notifications';
 import { Ranks } from './Ranks';
 
@@ -99,7 +100,7 @@ export class Marriages {
         }
         const when = db.value(
             `SELECT MAX(answered_at) FROM game_proposals WHERE status = 'declined' AND from_id = ? AND (head_id = ? OR spouse_id = ?)
-               AND answered_at > SUBDATE(UTC_TIMESTAMP(), ` + Marriages.RETRY_DAYS + ')',
+               AND answered_at > SUBDATE(` + Clock.sqlNow() + `, ` + Marriages.RETRY_DAYS + ')',
             [me.id, other.id, other.id],
         );
         if (when) {
@@ -212,7 +213,7 @@ export class Marriages {
         const proposal = Marriages.openProposal(id)!;
         const db = Auth.db();
         if (!yes) {
-            db.run("UPDATE game_proposals SET status = 'declined', answered_at = UTC_TIMESTAMP() WHERE id = ?", [id]);
+            db.run("UPDATE game_proposals SET status = 'declined', answered_at = " + Clock.sqlNow() + ' WHERE id = ?', [id]);
             return;
         }
         db.run('UPDATE game_anthros SET spouse_of = ? WHERE id = ?', [proposal.head_id, proposal.spouse_id]);

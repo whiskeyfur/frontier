@@ -66,7 +66,8 @@ export function home(app: App, user: User, post: boolean): void {
     } else if (post) {
         // The game's first anthro can start with a slave to breed with ("starter": '', 'mate', 'sire' or 'dam').
         const first = !player && Anthros.gameIsEmpty();
-        error = Anthros.setPlayer(user, form.name, form.gender_id, form.species_id, form.birthdate);
+        error = Anthros.setPlayer(user, form.name, form.gender_id, form.species_id, form.birthdate,
+            field(p, 'skill_id') === '' ? null : int(field(p, 'skill_id')));
         if (error === null) {
             Session.data.flash = 'Your details are saved.';
             const starter = field(p, 'starter');

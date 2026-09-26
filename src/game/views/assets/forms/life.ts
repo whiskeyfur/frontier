@@ -5,6 +5,7 @@ import { gmdate, int, range, str, strtotimeOrThrow } from '../../../../core/php'
 import type { ViewContext } from '../../../../core/View';
 import type { Row } from '../../../../db/Db';
 import { Anthros } from '../../../Anthros';
+import { Clock } from '../../../Clock';
 import { Litters } from '../../../Litters';
 import { Urges } from '../../../Urges';
 
@@ -20,7 +21,7 @@ export default function lifeForm(v: ViewContext, { anthro, error, post }: { anth
     const weeksAfterBirth = (date: string | null) => born !== null && date ? Anthros.ageWeeks(born, date) + ' weeks old' : '';
     const isDam = !!anthro.is_female;
     const fields: [string, string, string | null, string, Record<string, string | number>][] = [
-        ['birthdate', 'Born', anthro.birthdate, 'Empty: unknown (it doesn\'t age).', { max: gmdate('Y-m-d') }],
+        ['birthdate', 'Born', anthro.birthdate, 'Empty: unknown (it doesn\'t age).', { max: Clock.today() }],
         ['fertile_on', 'Fertile from', anthro.fertile_on, 'Empty: no wait.', {}],
         ['fertile_until', 'Fertile until', anthro.fertile_until,
             Anthros.FERTILE_UNTIL_WEEKS[0] + '-' + Anthros.FERTILE_UNTIL_WEEKS[1] + ' weeks after birth; her old age.',

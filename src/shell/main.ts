@@ -158,10 +158,14 @@ document.addEventListener('submit', async (event) => {
 // Listeners page scripts add to the document or window, removed when the next page is shown (a page's scripts run
 // again each time it's shown, and would otherwise pile up).
 let pageListeners: [EventTarget, string, EventListenerOrEventListenerObject, unknown][] = [];
+// Likewise the intervals they start (the game clock's: see src/game/views/clock-bar.ts), which a page load would end.
+let pageIntervals: ReturnType<typeof setInterval>[] = [];
 
 function render(html: string, title: string): void {
     for (const [target, type, listener, options] of pageListeners) target.removeEventListener(type, listener, options as any);
     pageListeners = [];
+    for (const interval of pageIntervals) clearInterval(interval);
+    pageIntervals = [];
     document.querySelectorAll('.modal-backdrop, .offcanvas-backdrop, .tooltip').forEach((el) => el.remove());
     document.body.className = '';
     document.body.removeAttribute('style');
@@ -195,6 +199,7 @@ function runPageScripts(): void {
     const doc = document as any;
     const win = window as any;
     const originals = [doc.addEventListener, win.addEventListener];
+    const originalSetInterval = win.setInterval;
     const loaded: EventListenerOrEventListenerObject[] = [];
     const track = (target: EventTarget, original: typeof doc.addEventListener) =>
         function (this: EventTarget, type: string, listener: EventListenerOrEventListenerObject, options?: unknown) {
@@ -207,6 +212,11 @@ function runPageScripts(): void {
         };
     doc.addEventListener = track(document, originals[0]);
     win.addEventListener = track(window, originals[1]);
+    win.setInterval = (...args: Parameters<typeof setInterval>) => {
+        const interval = originalSetInterval.apply(window, args);
+        pageIntervals.push(interval);
+        return interval;
+    };
     try {
         document.body.querySelectorAll('script').forEach((old) => {
             const script = document.createElement('script');
@@ -224,6 +234,7 @@ function runPageScripts(): void {
     } finally {
         doc.addEventListener = originals[0];
         win.addEventListener = originals[1];
+        win.setInterval = originalSetInterval;
     }
 }
 

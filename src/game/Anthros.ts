@@ -15,6 +15,7 @@ import { Names } from './Names';
 import { Notifications } from './Notifications';
 import { Preferences } from './Preferences';
 import { Ranks } from './Ranks';
+import { Schedules } from './Schedules';
 import { Species } from './Species';
 import { Urges } from './Urges';
 import { Wallets } from './Wallets';
@@ -59,11 +60,11 @@ export class Anthros {
     // (Queries on it order by a.name, not upstream's bare name: SQLite finds a bare name ambiguous across the joins.)
     private static readonly SELECT = `SELECT a.id, a.name, a.player_id, pl.username AS player_name,
                                    a.gender_id, ge.name AS gender, ge.is_male, ge.is_female, ge.presents_as,
-                                   a.species_id, sp.name AS species, a.birthdate, a.fertile_on, a.fertile_until, a.fertile_weekday, a.max_cubs, a.urge_rise, a.standard_schedule_id, a.trade_occupation_id, a.seeking_occupation_id,
+                                   a.species_id, sp.name AS species, a.birthdate, a.fertile_on, a.fertile_until, a.fertile_weekday, a.max_cubs, a.urge_rise, a.standard_schedule_id, a.trade_occupation_id, a.trade_recipe_id, a.seeking_occupation_id,
                                    a.lifespan_weeks, a.died_at, a.young, a.hungry_on,
                                    pg.bred_on AS pregnant_bred_on, pg.due_on AS pregnant_due_on, pg.cubs AS pregnant_cubs,
                                    au.id AS auction_id, au.ends_at AS auction_ends_at, a.debt_rate, a.debt_since,
-                                   a.debt + a.debt_rate * FLOOR(TIMESTAMPDIFF('HOUR', a.debt_since, UTC_TIMESTAMP()) / 24) AS debt,
+                                   a.debt + a.debt_rate * FLOOR(TIMESTAMPDIFF('HOUR', a.debt_since, {GAME_NOW}) / 24) AS debt,
                                    a.owner_id, IF(a.owner_id = a.id, NULL, o.name) AS owner_name, o.player_id AS owner_player_id, a.created_at, a.breeding_id,
                                    a.title_rank, a.title_since, a.title_by_land, a.granted_rank, a.tax_rate, a.tax_balance, a.tax_overdue_since, a.liege_id, lg.name AS liege_name,
                                    a.spouse_of, hd.name AS spouse_of_name,
@@ -97,6 +98,13 @@ export class Anthros {
                             LEFT JOIN game_auctions au ON au.anthro_id = a.id AND au.status = 'open'`;
 
     /**
+     * SELECT (every anthro's columns), for the game's now (see Clock): a debt grows by the game's days.
+     */
+    private static select(): string {
+        return Anthros.SELECT.replace('{GAME_NOW}', Clock.sqlNow());
+    }
+
+    /**
      * What the user has: every anthro owned by the anthro they play (including itself, while it's free), their own
      * first. Empty if they don't play an anthro.
      */
@@ -106,7 +114,7 @@ export class Anthros {
             return [];
         }
         return Auth.db().all(
-            Anthros.SELECT + ' WHERE a.owner_id = ? ORDER BY a.id <> ?, a.name, a.id',
+            Anthros.select() + ' WHERE a.owner_id = ? ORDER BY a.id <> ?, a.name, a.id',
             [me, me],
         ).map(Anthros.withFlags);
     }
@@ -143,21 +151,21 @@ export class Anthros {
      * Every anthro and player, for admin tools, ordered by owner (players first) then name.
      */
     static all(): Row[] {
-        return Auth.db().all(Anthros.SELECT + ' ORDER BY o.name, a.player_id IS NULL, a.name, a.id').map(Anthros.withFlags);
+        return Auth.db().all(Anthros.select() + ' ORDER BY o.name, a.player_id IS NULL, a.name, a.id').map(Anthros.withFlags);
     }
 
     /**
      * Anthros with no owner: the game's (supplied for auction), for admins to transfer.
      */
     static unowned(): Row[] {
-        return Auth.db().all(Anthros.SELECT + ' WHERE a.owner_id IS NULL ORDER BY a.name, a.id').map(Anthros.withFlags);
+        return Auth.db().all(Anthros.select() + ' WHERE a.owner_id IS NULL ORDER BY a.name, a.id').map(Anthros.withFlags);
     }
 
     /**
      * The player's own row (whoever owns it), or null until they set themselves up.
      */
     static player(userId: number): Row | null {
-        const row = Auth.db().row(Anthros.SELECT + ' WHERE a.player_id = ?', [userId]);
+        const row = Auth.db().row(Anthros.select() + ' WHERE a.player_id = ?', [userId]);
         return row ? Anthros.withFlags(row) : null;
     }
 
@@ -217,7 +225,7 @@ export class Anthros {
      * For a player who already plays an anthro, only renames it, except that admins can change all of it.
      * Returns an error message, or null.
      */
-    static setPlayer(user: Row, name: string, genderId: number, speciesId: number, birthdate: string): string | null {
+    static setPlayer(user: Row, name: string, genderId: number, speciesId: number, birthdate: string, skillId: number | null = null): string | null {
         name = trim(name);
         let error = Anthros.validateName(name);
         if (error) {
@@ -239,6 +247,10 @@ export class Anthros {
             return error;
         }
         let born: string | null = birthdate === '' ? null : birthdate;
+        // A new anthro can start skilled (see Schedules::START_PRACTICE), at a skill of its player's era.
+        if (!player && skillId !== null && !Schedules.skills(Preferences.era(user.id)).has(skillId)) {
+            return 'Choose a skill from the list, or none.';
+        }
 
         const db = Auth.db();
         if (player) {
@@ -258,14 +270,18 @@ export class Anthros {
         // No birthdate given: just grown, born as long ago as anthros take to become fertile, and fertile from today.
         let fertileOn = Anthros.randomFertileOn(born);
         if (born === null) {
-            fertileOn = gmdate('Y-m-d');
-            born = gmdate('Y-m-d', strtotimeOrThrow('-' + random_int(Anthros.FERTILE_AGE_DAYS[0], Anthros.FERTILE_AGE_DAYS[1]) + ' days'));
+            fertileOn = Clock.today();
+            born = Clock.today(-random_int(Anthros.FERTILE_AGE_DAYS[0], Anthros.FERTILE_AGE_DAYS[1]));
         }
         db.run(
             'INSERT INTO game_anthros (gender_id, species_id, birthdate, fertile_on, player_id, name) VALUES (?, ?, ?, ?, ?, ?)',
             [genderId, speciesId, born, fertileOn, user.id, name],
         );
-        Anthros.free(db.lastInsertId());
+        const id = db.lastInsertId();
+        Anthros.free(id);
+        if (skillId !== null) {
+            db.run('INSERT INTO game_anthro_skills (anthro_id, skill_id, practice) VALUES (?, ?, ?)', [id, skillId, Schedules.START_PRACTICE]);
+        }
         return null;
     }
 
@@ -309,7 +325,7 @@ export class Anthros {
             Anthros.toAnthroIfPlayed(anthro, 'Your owner removed your debt; you can no longer buy your freedom.');
             return null;
         }
-        db.run('UPDATE game_anthros SET debt = ?, debt_rate = ?, debt_since = UTC_TIMESTAMP() WHERE id = ?',
+        db.run('UPDATE game_anthros SET debt = ?, debt_rate = ?, debt_since = ' + Clock.sqlNow() + ' WHERE id = ?',
             [int(amount), rate, anthro.id]);
         Anthros.toAnthroIfPlayed(anthro, 'Your owner set your debt to ' + Wallets.format(int(amount))
             + (rate ? ', growing by ' + Wallets.format(rate) + ' a day' : '') + '. Pay it to buy your freedom.');
@@ -375,7 +391,7 @@ export class Anthros {
     static available(nobles = false, q = '', limit: number | null = null): Row[] {
         const [where, params] = Anthros.availableWhere(nobles, q);
         return Auth.db().all(
-            Anthros.SELECT + ` WHERE ${where} ORDER BY a.name, a.id` + (limit === null ? '' : ' LIMIT ' + Math.max(1, limit)),
+            Anthros.select() + ` WHERE ${where} ORDER BY a.name, a.id` + (limit === null ? '' : ' LIMIT ' + Math.max(1, limit)),
             params,
         ).map(Anthros.withFlags);
     }
@@ -398,7 +414,7 @@ export class Anthros {
             return [];
         }
         const [where, params] = Anthros.availableWhere(true, '');
-        return Auth.db().all(Anthros.SELECT + ` WHERE ${where} AND ` + Anthros.freeSql('a') + ' AND a.title_rank IN ('
+        return Auth.db().all(Anthros.select() + ` WHERE ${where} AND ` + Anthros.freeSql('a') + ' AND a.title_rank IN ('
             + nobles.map(int).join(', ') + ') ORDER BY a.name, a.id', params).map(Anthros.withFlags);
     }
 
@@ -445,7 +461,7 @@ export class Anthros {
         if (birthdate === null) {
             return null;
         }
-        asOf = asOf === null ? gmdate('Y-m-d') : asOf.slice(0, 10);
+        asOf = asOf === null ? Clock.today() : asOf.slice(0, 10);
         const days = Math.floor((int(strtotime(asOf + ' UTC')) - int(strtotime(birthdate + ' UTC'))) / 86400);
         return intdiv(Math.max(0, days), 7);
     }
@@ -455,7 +471,7 @@ export class Anthros {
      * life ahead.
      */
     static randomAdultBirthdate(): string {
-        return gmdate('Y-m-d', strtotimeOrThrow('-' + random_int(Anthros.ADULT_WEEKS[0] * 7, Anthros.ADULT_WEEKS[1] * 7) + ' days'));
+        return Clock.today(-random_int(Anthros.ADULT_WEEKS[0] * 7, Anthros.ADULT_WEEKS[1] * 7));
     }
 
     /**
@@ -486,7 +502,7 @@ export class Anthros {
     static comeOfAge(): number {
         const db = Auth.db();
         const grown: number[] = db.column(
-            'SELECT id FROM game_anthros WHERE young AND died_at IS NULL AND (fertile_on IS NULL OR fertile_on <= UTC_DATE()) ORDER BY id',
+            'SELECT id FROM game_anthros WHERE young AND died_at IS NULL AND (fertile_on IS NULL OR fertile_on <= ' + Clock.sqlToday() + ') ORDER BY id',
         );
         for (const id of grown) {
             db.beginTransaction();
@@ -550,7 +566,7 @@ export class Anthros {
             }
             until = null;
         } else {
-            if (born > gmdate('Y-m-d')) {
+            if (born > Clock.today()) {
                 return 'Born: the birthdate cannot be in the future.';
             }
             if (from !== null && from < born) {
@@ -645,7 +661,7 @@ export class Anthros {
      * Whether the anthro can breed today (no fertile date means no restriction).
      */
     static isFertile(anthro: Row): boolean {
-        return anthro.fertile_on === null || anthro.fertile_on <= gmdate('Y-m-d');
+        return anthro.fertile_on === null || anthro.fertile_on <= Clock.today();
     }
 
     /**
@@ -679,7 +695,7 @@ export class Anthros {
      * Whether the anthro is past the age a dam can conceive (its fertile_until has gone by). Sires aren't held to it.
      */
     static pastBearing(anthro: Row): boolean {
-        return (anthro.fertile_until ?? null) !== null && anthro.fertile_until < gmdate('Y-m-d');
+        return (anthro.fertile_until ?? null) !== null && anthro.fertile_until < Clock.today();
     }
 
     /**
@@ -727,7 +743,7 @@ export class Anthros {
             if (anthro.pregnant_cubs >= Anthros.maxCubs(anthro)) {
                 return 'litter full';
             }
-            if (!forced && anthro.pregnant_bred_on !== gmdate('Y-m-d')) {
+            if (!forced && anthro.pregnant_bred_on !== Clock.today()) {
                 return `pregnant, due ${anthro.pregnant_due_on}`;
             }
         }
@@ -871,7 +887,7 @@ export class Anthros {
      */
     static find(userId: number, id: number): Row | null {
         const me = Wallets.anthroFor(userId);
-        const row = Auth.db().row(Anthros.SELECT + ' WHERE a.owner_id = ? AND a.id = ?', [me, id]);
+        const row = Auth.db().row(Anthros.select() + ' WHERE a.owner_id = ? AND a.id = ?', [me, id]);
         return row ? Anthros.withFlags(row) : null;
     }
 
@@ -879,7 +895,7 @@ export class Anthros {
      * Any anthro regardless of owner. Only for admins, or after checking canView().
      */
     static findAny(id: number): Row | null {
-        const row = Auth.db().row(Anthros.SELECT + ' WHERE a.id = ?', [id]);
+        const row = Auth.db().row(Anthros.select() + ' WHERE a.id = ?', [id]);
         return row ? Anthros.withFlags(row) : null;
     }
 
@@ -944,7 +960,7 @@ export class Anthros {
      * The anthros employed by the anthro the user plays, by name.
      */
     static employedBy(userId: number): Row[] {
-        return Auth.db().all(Anthros.SELECT + ' WHERE a.employer_id = ? ORDER BY a.name, a.id', [Wallets.anthroFor(userId)])
+        return Auth.db().all(Anthros.select() + ' WHERE a.employer_id = ? ORDER BY a.name, a.id', [Wallets.anthroFor(userId)])
             .map(Anthros.withFlags);
     }
 
@@ -954,7 +970,7 @@ export class Anthros {
     static forHire(q = '', limit: number | null = null): Row[] {
         const [nameWhere, params] = Anthros.nameStartsWith(q);
         return Auth.db().all(
-            Anthros.SELECT + ' WHERE a.wage IS NOT NULL AND a.employer_id IS NULL AND au.id IS NULL AND ' + Anthros.freeSql('a') + nameWhere
+            Anthros.select() + ' WHERE a.wage IS NOT NULL AND a.employer_id IS NULL AND au.id IS NULL AND ' + Anthros.freeSql('a') + nameWhere
             + ' ORDER BY a.wage, a.name, a.id' + (limit === null ? '' : ' LIMIT ' + Math.max(1, limit)),
             params,
         ).map(Anthros.withFlags);
@@ -977,7 +993,7 @@ export class Anthros {
      */
     static findControlled(userId: number, id: number): Row | null {
         const me = Wallets.anthroFor(userId);
-        const row = Auth.db().row(Anthros.SELECT + ' WHERE a.owner_id = ? AND a.id = ?', [me, id]);
+        const row = Auth.db().row(Anthros.select() + ' WHERE a.owner_id = ? AND a.id = ?', [me, id]);
         return row ? Anthros.withFlags(row) : null;
     }
 
@@ -1320,7 +1336,7 @@ export class Anthros {
         if (!isValidDate(birthdate) || int(birthdate.slice(0, 4)) < 1900) {
             return 'Enter a valid birthdate.';
         }
-        if (birthdate > gmdate('Y-m-d')) {
+        if (birthdate > Clock.today()) {
             return 'The birthdate cannot be in the future.';
         }
         if (Anthros.ageWeeks(birthdate)! >= Anthros.LIFESPAN_MIN) {

@@ -3,7 +3,6 @@
 -- upstream PHP (Anthros::LIFESPAN_MIN 52, LIFESPAN_MAX 80, FERTILE_UNTIL_WEEKS [47, 52] = 329..364 days,
 -- OLD_AGE_WEEKS 20 = 140 days; Litters::MIN_CUBS 1, MAX_CUBS 8; Anthros' starting food 7 and coins 0..100):
 -- keep them in step with src/game/Anthros.ts and src/game/Litters.ts.
--- And its game-time triggers (Game\Schema::gameClock), after the game_anthros ones.
 
 -- game_anthro_fertile_weekday: a random day of the week a dam can conceive.
 CREATE TRIGGER game_anthro_fertile_weekday AFTER INSERT ON game_anthros FOR EACH ROW WHEN NEW.fertile_weekday IS NULL
@@ -51,28 +50,4 @@ BEGIN
     INSERT INTO game_wallets (anthro_id, balance) VALUES (NEW.id, FLOOR(RAND() * 101));
     INSERT INTO game_ledger (anthro_id, amount, balance_after, reason)
     SELECT anthro_id, balance, balance, 'Starting balance' FROM game_wallets WHERE anthro_id = NEW.id;
-END;
-
--- {table}_game_time (Schema::gameClock): rows stamped when they're made take the game's time, which the clock gives the
--- connection as @game_now (here VARIABLE('game_now'): see Clock.bind). Only the column's default (the real now): a time
--- given (a save restored, a test) is kept. (Upstream: NEW.column >= NOW() - INTERVAL 1 MINUTE.)
-CREATE TRIGGER game_anthros_game_time AFTER INSERT ON game_anthros FOR EACH ROW
-WHEN VARIABLE('game_now') IS NOT NULL AND TIMESTAMPDIFF('SECOND', NEW.created_at, NOW()) <= 60
-BEGIN
-    UPDATE game_anthros SET created_at = VARIABLE('game_now') WHERE id = NEW.id;
-END;
-CREATE TRIGGER game_breedings_game_time AFTER INSERT ON game_breedings FOR EACH ROW
-WHEN VARIABLE('game_now') IS NOT NULL AND TIMESTAMPDIFF('SECOND', NEW.bred_at, NOW()) <= 60
-BEGIN
-    UPDATE game_breedings SET bred_at = VARIABLE('game_now') WHERE id = NEW.id;
-END;
-CREATE TRIGGER game_parcels_game_time AFTER INSERT ON game_parcels FOR EACH ROW
-WHEN VARIABLE('game_now') IS NOT NULL AND TIMESTAMPDIFF('SECOND', NEW.created_at, NOW()) <= 60
-BEGIN
-    UPDATE game_parcels SET created_at = VARIABLE('game_now') WHERE id = NEW.id;
-END;
-CREATE TRIGGER game_buildings_game_time AFTER INSERT ON game_buildings FOR EACH ROW
-WHEN VARIABLE('game_now') IS NOT NULL AND TIMESTAMPDIFF('SECOND', NEW.started_at, NOW()) <= 60
-BEGIN
-    UPDATE game_buildings SET started_at = VARIABLE('game_now') WHERE id = NEW.id;
 END;

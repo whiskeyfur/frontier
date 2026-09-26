@@ -3,6 +3,7 @@ import { Auth } from '../core/Auth';
 import type { Row } from '../db/Db';
 import { array_unique, int, mb_strlen, trim } from '../core/php';
 import { Anthros } from './Anthros';
+import { Clock } from './Clock';
 import { Notifications } from './Notifications';
 import { Wallets } from './Wallets';
 
@@ -176,7 +177,7 @@ export class Groups {
         db.beginTransaction();
         // Rolling starts with the day it's formed.
         db.run(
-            'INSERT INTO game_breeding_groups (name, owner_anthro_id, created_by, rolled_through) VALUES (?, ?, ?, SUBDATE(UTC_DATE(), 1))',
+            'INSERT INTO game_breeding_groups (name, owner_anthro_id, created_by, rolled_through) VALUES (?, ?, ?, SUBDATE(' + Clock.sqlToday() + ', 1))',
             [name, Wallets.anthroFor(user.id), user.id],
         );
         const groupId = db.lastInsertId();

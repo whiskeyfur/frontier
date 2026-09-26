@@ -1,7 +1,8 @@
 /**
  * MariaDB functions the game's SQL uses, registered on each SQLite connection, so queries port with few changes.
  * They follow MariaDB: NULL in, NULL out (GREATEST, LEAST, CONCAT, DATEDIFF...). Dates are 'YYYY-MM-DD' text and
- * times 'YYYY-MM-DD HH:MM:SS' text, in UTC, from the game clock (src/core/time.ts).
+ * times 'YYYY-MM-DD HH:MM:SS' text, in UTC, from the real clock (src/core/time.ts, which tests can stop). The game's own
+ * time (src/game/Clock.ts) goes into queries as literals (Clock.sqlToday(), Clock.sqlNow()), as upstream's does.
  *
  * Not the same as MariaDB, so rewrite these when porting (see PORTING.md):
  *   x + INTERVAL n DAY  → ADDDATE(x, n)        x - INTERVAL n DAY → SUBDATE(x, n)
@@ -63,7 +64,7 @@ function compare(a: Value, b: Value): number {
     return x < y ? -1 : x > y ? 1 : 0;
 }
 
-export function registerFunctions(db: Database): void {
+export function registerFunctions(db: Database, variable: (name: string) => Value = () => null): void {
     // sql.js registers a function with as many arguments as its .length; -1 lets it take any number (for optional
     // and variadic arguments).
     const fn = (name: string, f: (...args: any[]) => Value, variadic = false) => {
@@ -75,6 +76,8 @@ export function registerFunctions(db: Database): void {
     fn('UTC_TIMESTAMP', (fraction?: number) => formatDateTime(nowMs(), fraction ?? 0), true);
     fn('NOW', (fraction?: number) => formatDateTime(nowMs(), fraction ?? 0), true);
     fn('RAND', () => random());
+    // A user variable (MariaDB's @name: see Db.setVariable), or NULL.
+    fn('VARIABLE', (name: Value) => variable(String(name)));
     fn('IF', (condition: Value, a: Value, b: Value) => (condition !== null && condition !== 0 && condition !== '0' && condition !== '' ? a : b));
     fn('FLOOR', (x: Value) => (x === null ? null : Math.floor(Number(x))));
     fn('CEIL', (x: Value) => (x === null ? null : Math.ceil(Number(x))));

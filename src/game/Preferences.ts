@@ -1,10 +1,13 @@
 // Upstream: game/src/Preferences.php
 import { Auth } from '../core/Auth';
+import { float, int, is_numeric, round, trim } from '../core/php';
 import type { Row } from '../db/Db';
 import { Anthros } from './Anthros';
+import { Clock } from './Clock';
 
 /**
- * Each player's game preferences (game_preferences; kept across resets). For now, the era they play in:
+ * Each player's game preferences (game_preferences; kept across resets): the pace they'd like the game's time to run at
+ * (see timeRate: the game runs at the slowest asked for), and the era they play in:
  *  - the Dark Ages (the default);
  *  - the Renaissance: more artistic skills and occupations to train and work at (see Schedules::RENAISSANCE_SKILLS),
  *    but no breeding attempts with an anthro younger than MIN_BREEDING_WEEKS.
@@ -37,6 +40,32 @@ export class Preferences {
             'INSERT INTO game_preferences (user_id, era) VALUES (?, ?) ON CONFLICT (user_id) DO UPDATE SET era = excluded.era',
             [user.id, era],
         );
+        return null;
+    }
+
+    /**
+     * The pace the player asks the game's time to run at, in game days per real day, or null if they haven't asked
+     * (see Clock::wanted: the game runs at the slowest pace anyone playing asks for).
+     */
+    static timeRate(userId: number): number | null {
+        const rate = Auth.db().value('SELECT time_rate FROM game_preferences WHERE user_id = ?', [userId]);
+        return rate === null ? null : float(rate);
+    }
+
+    /**
+     * Saves the pace the player asks for ('' for none: they don't mind), Clock::RATE_MIN to Clock::RATE_MAX game days
+     * per real day, to two decimals. The game's pace follows at once (see Clock::sync). Returns an error message, or null.
+     */
+    static setTimeRate(user: Row, rate: string): string | null {
+        rate = trim(rate);
+        if (rate !== '' && (!is_numeric(rate) || float(rate) < Clock.RATE_MIN || float(rate) > Clock.RATE_MAX)) {
+            return 'Ask for ' + Clock.RATE_MIN + ' to ' + int(Clock.RATE_MAX) + ' game days per real day, or leave it empty.';
+        }
+        Auth.db().run(
+            'INSERT INTO game_preferences (user_id, time_rate) VALUES (?, ?) ON CONFLICT (user_id) DO UPDATE SET time_rate = excluded.time_rate',
+            [user.id, rate === '' ? null : round(float(rate), 2)],
+        );
+        Clock.sync();
         return null;
     }
 

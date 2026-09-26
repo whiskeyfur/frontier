@@ -8,7 +8,7 @@ import { App } from '../../../game/App';
 import { Played } from '../../../game/Played';
 
 /**
- * Admins' panel (opened by the Admin button at the top left): the admin controls for the page you're on (pages add
+ * Admins' panel (opened by the Admin button at the top right): the admin controls for the page you're on (pages add
  * them with v.push('admin', ...)), then every admin page. Players never see it.
  */
 export default function adminPanel(v: ViewContext): Html {

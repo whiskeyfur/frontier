@@ -11,6 +11,7 @@ import { Jobs } from '../Jobs';
 import { Land } from '../Land';
 import { Ranks } from '../Ranks';
 import { Resets } from '../Resets';
+import { Schedules } from '../Schedules';
 import { Wallets } from '../Wallets';
 import gender from './assets/gender';
 import nameInput from './assets/name-input';
@@ -209,13 +210,14 @@ export default function index(v: ViewContext, data: IndexData): Html {
                     <thead>
                     <tr>
                         <th>Name</th>
-                        <th>Gender</th><th>Species</th><th>Age</th><th>Owner</th><th data-nosort></th>
+                        <th>Job</th><th>Gender</th><th>Species</th><th>Age</th><th>Owner</th><th data-nosort></th>
                     </tr>
                     </thead>
                     <tbody>
                     ${available.map((anthro) => html`
                         <tr>
                             <td>${anthro.name}</td>
+                            <td>${Schedules.jobLabel(anthro) ?? '—'}</td>
                             <td>${gender(v, { gender: anthro.gender, presentsAs: anthro.presents_as })} ${anthro.gender}</td>
                             <td>${anthro.species ?? '—'}</td>
                             <td class="text-nowrap" data-sort="${anthro.birthdate}">${Anthros.age(anthro.birthdate)}</td>

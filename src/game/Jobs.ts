@@ -3,6 +3,7 @@ import { Auth, type User } from '../core/Auth';
 import { array_rand, array_unique, ctype_digit, gmdate, int, random_int, spaceship, strtotimeOrThrow, trim } from '../core/php';
 import type { Row } from '../db/Db';
 import { Anthros } from './Anthros';
+import { Clock } from './Clock';
 import { Genders } from './Genders';
 import { Names } from './Names';
 import { Notifications } from './Notifications';
@@ -152,7 +153,7 @@ export class Jobs {
         }
         Wallets.change(anthro.id, wage, 'Wages from ' + Jobs.employerName(payer));
         db.run(
-            `UPDATE game_anthros SET employer_id = ?, employed_wage = ?, employed_since = UTC_TIMESTAMP(), paid_until = UTC_DATE()
+            `UPDATE game_anthros SET employer_id = ?, employed_wage = ?, employed_since = ` + Clock.sqlNow() + `, paid_until = ` + Clock.sqlToday() + `
              WHERE id = ?`,
             [payer, wage, anthro.id],
         );
@@ -271,14 +272,14 @@ export class Jobs {
     static payDue(): number {
         Jobs.assignWages();
         const db = Auth.db();
-        const due = db.column('SELECT id FROM game_anthros WHERE employer_id IS NOT NULL AND paid_until < UTC_DATE()');
+        const due = db.column('SELECT id FROM game_anthros WHERE employer_id IS NOT NULL AND paid_until < ' + Clock.sqlToday() + '');
         let paid = 0;
         for (const id of due) {
             db.beginTransaction();
             // (Upstream locks the employee here with SELECT ... FOR UPDATE, so two requests can't pay the same day
             // twice: nothing to do in SQLite.)
             const anthro = Anthros.findAny(int(id))!;
-            while (anthro.employer_id != null && anthro.paid_until < gmdate('Y-m-d')) {
+            while (anthro.employer_id != null && anthro.paid_until < Clock.today()) {
                 const payer = anthro.employer_id;
                 const wage = int(anthro.employed_wage);
                 const day = gmdate('Y-m-d', strtotimeOrThrow(anthro.paid_until + ' +1 day'));

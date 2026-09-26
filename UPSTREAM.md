@@ -9,7 +9,7 @@ This is a browser port of the game Frontier from [whiskeyfur/jcw-website](https:
 
 ## Synced commit
 
-Ported from upstream `dev` at **e5cd15c9ee00f0435896a81fc13ec1e7c0cfedf9** (Docs and privacy, account deletion, work that makes goods, 2026-09-26).
+Ported from upstream `dev` at **a79b6525170a8672e86890e0ffd9ec350949fdb8** (Game clock and pace, peopled resets, starting skills, deploy clears cache, 2026-09-26).
 
 ## Syncing an upstream change
 

@@ -5,6 +5,7 @@ import type { Row } from '../../../src/db/Db';
 import { Anthros } from '../../../src/game/Anthros';
 import { Groups } from '../../../src/game/Groups';
 import { Litters } from '../../../src/game/Litters';
+import { Schedules } from '../../../src/game/Schedules';
 import { flash, get, post, request } from '../../AppHarness';
 import {
     admin, anthro, anthroOf, db, genderId, player, playerAnthro, refresh, scalar, setCoins, speciesId,
@@ -38,6 +39,20 @@ describe('App: home and anthro pages', () => {
         expect(location).toBe('/game/home');
         expect(Anthros.player(alice.id)!.name).toBe('Fenn');
         expect(get('/game/home', alice)).toContain('Your details are saved.');
+    });
+
+    test('a new anthro chooses its skill', () => {
+        const bob = player('bobby');
+        const form = get('/game/home', bob);
+        expect(form).toContain('name="skill_id"');
+        expect(form, 'Each skill with its trades.').toMatch(/>Brewing \(Alewife, Brewer\)<\/option>/);
+        const brewing = Number(scalar("SELECT id FROM game_skills WHERE name = 'Brewing'"));
+        const [, , bad] = request('POST', '/game/home', { name: 'Hops', gender_id: genderId('Male'), species_id: speciesId(), skill_id: 99999 }, bob);
+        expect(bad).toContain('Choose a skill from the list, or none.');
+        post('/game/home', { name: 'Hops', gender_id: genderId('Male'), species_id: speciesId(), skill_id: brewing }, bob);
+        const me = Anthros.player(bob.id)!;
+        expect(Schedules.skillsOf(me.id)).toEqual([{ name: 'Brewing', practice: 28, level: 'Journeyman', titles: 'Brewer, Alewife' }]);
+        expect(Schedules.learned(me.id), 'It can work at once.').toContain(brewing);
     });
 
     test('form errors are shown', () => {

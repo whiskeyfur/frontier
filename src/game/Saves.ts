@@ -1,10 +1,12 @@
 // Upstream: game/src/Saves.php
 import { Auth } from '../core/Auth';
-import { array_fill, gmdate, int, json_encode, mb_strlen, mb_substr, trim } from '../core/php';
+import { array_fill, gmdate, int, json_encode, mb_strlen, mb_substr, str, trim } from '../core/php';
 import type { Row } from '../db/Db';
 import { COLUMNS, FOREIGN_KEYS } from '../db/meta';
+import { toGameCalendar } from '../db/migrations';
 import { Anthros } from './Anthros';
 import { Board } from './Board';
+import { Clock } from './Clock';
 import { Crafts } from './Crafts';
 import { Market } from './Market';
 import { Notifications } from './Notifications';
@@ -59,7 +61,8 @@ export class Saves {
         for (const table of [...Saves.CONFIG_TABLES, ...Board.TABLES]) {
             tables[table] = db.all(`SELECT * FROM ${table}`);
         }
-        const snapshot = { saved_at: gmdate('Y-m-d H:i:s'), tables };
+        // When it was saved, in real time, and in the game's (see Clock): restored, it carries on from there.
+        const snapshot = { saved_at: gmdate('Y-m-d H:i:s'), game_time: Clock.time(), tables };
         db.run('INSERT INTO game_saves (name, anthros, data, created_by) VALUES (?, ?, ?, ?)', [
             name, tables.game_anthros.length, new TextEncoder().encode(json_encode(snapshot)), admin.id,
         ]);
@@ -125,6 +128,16 @@ export class Saves {
             Market.forget();
             Crafts.forget();
             Ranks.forget();
+            // The game's clock carries on from when it was saved; a save from before the game had its own calendar
+            // moves to it first (see Schema::toGameCalendar).
+            Clock.forget();
+            if (snapshot.game_time !== undefined && snapshot.game_time !== null) {
+                Clock.resume(int(snapshot.game_time));
+            } else {
+                db.exec("DELETE FROM game_settings WHERE name LIKE 'clock\\_%' ESCAPE '\\'");
+                toGameCalendar(db, str(snapshot.saved_at ?? gmdate('Y-m-d')).substring(0, 10));
+                Clock.forget();
+            }
             db.commit();
             db.exec('PRAGMA foreign_keys = ON');
         } catch (e) {

@@ -2,6 +2,7 @@
 import { cls, html, type Html } from '../../core/html';
 import type { ViewContext } from '../../core/View';
 import { App } from '../App';
+import clockBar from './clock-bar';
 
 /**
  * A second navigation bar, under the site's header, for the pages of a menu section (section: its path in
@@ -24,6 +25,7 @@ export default function subnav(v: ViewContext, { section }: { section: string })
                         <a class="${cls('nav-link px-3 py-2', { active: active === href })}" href="${href}" ${active === href ? html`aria-current="page"` : ''}>${label}</a>
                     </li>`)}
             </ul>
+            ${clockBar(v)}
         </div>
     </nav>`);
 }

@@ -5,6 +5,7 @@ import { empty, number_format, range, ucfirst } from '../../../core/php';
 import type { ViewContext } from '../../../core/View';
 import { Baronies } from '../../Baronies';
 import { Board } from '../../Board';
+import { Clock } from '../../Clock';
 import { Ranks } from '../../Ranks';
 import gameLayout from '../layouts/game';
 
@@ -12,16 +13,17 @@ import gameLayout from '../layouts/game';
 export default function resetGame(v: ViewContext, { counts, error, post }: { counts: Record<string, number>; error: string | null; post: InputArray }): Html {
     const posted = Object.keys(post).length > 0;
     const postedRanks = typeof post.ranks === 'object' ? post.ranks : {};
+    const postedPlaces = typeof post.places === 'object' ? post.places : {};
     return gameLayout(v, {
         title: 'Reset game - Game admin',
         content: html`
-    <div class="mx-auto" style="max-width: 40rem">
+    <div class="mx-auto" style="max-width: 56rem">
         <h1 class="h3 mb-1">Reset game</h1>
         <p class="text-body-secondary">
             Deletes every anthro, players' anthros included, all land and baronies, and everything that happened in the
             game. Players start over by creating an anthro. Choose how many title holders of each rank the new game
-            starts with: with none, it starts empty, and the first player can also start with a slave to breed with. If no
-            barony is seated, there's still one, held by no one: three villages, a town and an expanse, with
+            starts with, and at least how many commoners and settlements. If no barony is seated, there's still one, held
+            by no one: three villages, a town and an expanse, with
             ${number_format(Baronies.EMPTY_ACRES[0])} to ${number_format(Baronies.EMPTY_ACRES[1])} acres of the land office's land.
             Land earns ranks from baronet up. Species, genders, names, ranks and site accounts are kept.
         </p>
@@ -42,12 +44,14 @@ export default function resetGame(v: ViewContext, { counts, error, post }: { cou
         </table>
         <form method="post" action="/game/admin/reset-game" class="card card-body border-danger">
             <input type="hidden" name="csrf" value="${v.csrf}">
+            <div class="row g-4 mb-2">
+            <div class="col-md-6">
             <h2 class="h6">The new game's court</h2>
             <p class="form-text mt-0">
                 How many of each rank to create: free, unplayed anthros holding titles granted by the crown. Each is sworn
                 to someone of the nearest rank above that has anyone, spread evenly.
             </p>
-            <div class="row g-2 mb-2" style="max-width: 28rem">
+            <div class="row g-2 mb-2">
                 ${range(Ranks.KING, Ranks.KNIGHT).map((rank) => html`
                     <label class="col-6 col-form-label col-form-label-sm" for="rank-${rank}">
                         ${Ranks.name(rank)}${Ranks.isNoble(rank) ? '' : ' (not noble)'}
@@ -68,10 +72,36 @@ export default function resetGame(v: ViewContext, { counts, error, post }: { cou
                     each ${Ranks.name(3)}, a village, manor or expanse for each ${Ranks.name(Ranks.KNIGHT)}, and their commoners
                 </label>
             </div>
+            </div>
+            <div class="col-md-6">
+                ${/* At least this many: a court's own (and the empty barony's) count, and the rest are added. */ ''}
+                <h2 class="h6">Its people and places</h2>
+                <p class="form-text mt-0">
+                    At least how many: those the court brings count, and the rest are added. New commoners are free and
+                    unplayed, and every trade is someone's. New settlements are spread over the baronies, nobody managing
+                    them yet, each with the land office's land.
+                </p>
+                <div class="row g-2 mb-2">
+                    ${([['commoners', 'Commoners', Ranks.MIN_COMMONERS, Ranks.MAX_COMMONERS, Ranks.MIN_COMMONERS],
+                        ['village', 'Villages', 0, Board.MAX_SETTLEMENTS, 0], ['town', 'Towns', 0, Board.MAX_SETTLEMENTS, 0],
+                        ['city', 'Cities', 0, Board.MAX_SETTLEMENTS, 0]] as const).map(([what, label, min, max, dflt]) => html`
+                        <label class="col-6 col-form-label col-form-label-sm" for="places-${what}">${label}</label>
+                        <div class="col-6">
+                            <input class="form-control form-control-sm" id="places-${what}" name="places[${what}]" type="number" min="${min}"
+                                   max="${max}" value="${postedPlaces[what] ?? dflt}">
+                        </div>`)}
+                </div>
+            </div>
+            </div>
             <hr>
             <div class="form-check mb-3">
                 <input class="form-check-input" type="checkbox" id="save_first" name="save_first" value="1" checked>
                 <label class="form-check-label" for="save_first">Save the game first (as "Before reset")</label>
+            </div>
+            <div class="mb-3">
+                <label class="form-label" for="start">The game starts on</label>
+                <input class="form-control w-auto" id="start" name="start" type="date" min="1000-01-01" value="${post.start ?? Clock.START}" required>
+                <div class="form-text">Its own calendar: the game's first day. Time then runs at the players' rate (see Preferences).</div>
             </div>
             <label class="form-label" for="confirm">Type <strong>${Board.CONFIRM_WORD}</strong> to confirm</label>
             <div class="d-flex flex-wrap gap-2">

@@ -130,7 +130,7 @@ export default function schedule(v: ViewContext, {
                 <input type="hidden" name="action" value="plan">
                 <div class="d-flex flex-wrap align-items-center gap-2">
                     <input class="form-control form-control-sm w-auto" type="date" name="date" required aria-label="Day"
-                           min="${gmdate('Y-m-d')}" max="${gmdate('Y-m-d', strtotimeOrThrow('+' + Schedules.PLAN_AHEAD_DAYS + ' days'))}"
+                           min="${Clock.today()}" max="${Clock.today(Schedules.PLAN_AHEAD_DAYS)}"
                            value="${field(post, 'date')}">
                     ${planFields(v, { plan: postAction === 'plan'
                         ? { activity: field(post, 'activity', 'work'), detail: field(post, 'detail') } : { activity: 'work' },

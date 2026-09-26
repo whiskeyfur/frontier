@@ -2,7 +2,7 @@
 import { Auth, type User } from '../core/Auth';
 import { onReset } from '../core/caches';
 import {
-    empty, gmdate, int, intdiv, mb_strlen, pick, random_int, str, strtotime, strtotimeOrThrow, trim,
+    array_rand, empty, float, gmdate, int, intdiv, mb_strlen, pick, random_int, shuffle, str, strtotime, trim,
 } from '../core/php';
 import type { Db, Row } from '../db/Db';
 import { Anthros } from './Anthros';
@@ -85,6 +85,9 @@ export class Schedules {
     static readonly FORAGE_FOOD = [1, 3];
     // Coins a day's service work (an occupation with no recipe: see Crafts) earns, by the worker's level at its skill.
     static readonly PAY: Record<string, number> = { Novice: 2, Apprentice: 4, Journeyman: 8, Master: 15 };
+    // A new player's anthro starts this practised at the skill its player chooses (a Journeyman, as the world's commoners
+    // are: see spreadTrades), so it can work at once.
+    static readonly START_PRACTICE = 28;
     // Days of practice at a skill before an anthro can work at its occupations: training first, then work.
     static readonly WORK_MIN_PRACTICE = 1;
     // The skills a new game starts with, and the occupations (titles) that go with each: the trades of medieval
@@ -299,13 +302,115 @@ export class Schedules {
         }
         const practice = Auth.db().value('SELECT practice FROM game_anthro_skills WHERE anthro_id = ? AND skill_id = ?', [anthro.id, trade.skill_id]);
         if (int(practice) >= Schedules.MENTOR_PRACTICE) {
-            return { ...Schedules.noDetails(), ...Schedules.tradePlan(trade), default: true };
+            return { ...Schedules.noDetails(), default: true, recipe_id: anthro.trade_recipe_id != null ? int(anthro.trade_recipe_id) : null, ...Schedules.tradePlan(trade) };
         }
         const mentor = Schedules.mentorOf(anthro);
         return {
             ...Schedules.noDetails(), activity: 'train', skill_id: int(trade.skill_id), skill_name: trade.skill, default: true,
             mentor_id: mentor?.id ?? null, mentor_name: mentor?.name ?? null,
         };
+    }
+
+    // The trades that feed a new game (see spreadTrades), each with the recipe it works: {title: recipe name}.
+    static readonly FOOD_TRADES: Record<string, string> = { Farmer: 'Vegetables', Fisher: 'Fish', Hunter: 'Game', Swineherd: 'Pork' };
+    // How much more food than they eat the food trades make, together.
+    static readonly FOOD_MARGIN = 1.2;
+
+    /**
+     * Gives the free commoners (untitled, unplayed, living) trades, each as a Journeyman (INDEPENDENT_PRACTICE days), in
+     * random order: first enough of FOOD_TRADES, in turn, to feed them all (at a Journeyman's output, with FOOD_MARGIN
+     * over), a farmer given the land farming takes if it has none (see giveFarmland; without the land office's to give,
+     * it fishes instead); then one of each other occupation (of every era); then random ones (not needing land). A new
+     * game does this (see Board::reset). Returns how many were given one.
+     */
+    static spreadTrades(): number {
+        const db = Auth.db();
+        const ids: number[] = db.column(
+            'SELECT a.id FROM game_anthros a WHERE a.title_rank IS NULL AND a.player_id IS NULL AND ' + Anthros.freeSql('a') + ' ORDER BY RAND()',
+        ).map(int);
+        const occupations = [...Schedules.occupations().values()];
+        if (!ids.length || !occupations.length) {
+            return 0;
+        }
+        const byTitle: Record<string, Row> = {};
+        for (const occupation of occupations) {
+            byTitle[occupation.title] ??= occupation;
+        }
+        const edibles = Goods.edibles();
+        const trade = 'UPDATE game_anthros SET trade_occupation_id = ?, trade_recipe_id = ? WHERE id = ?';
+        const skill = 'INSERT INTO game_anthro_skills (anthro_id, skill_id, practice) VALUES (?, ?, ?) ON CONFLICT (anthro_id, skill_id) DO UPDATE SET practice = GREATEST(practice, excluded.practice)';
+        const give = (id: number, occupation: Row, recipeId: number | null): void => {
+            db.run(trade, [occupation.id, recipeId, id]);
+            db.run(skill, [id, occupation.skill_id, Schedules.INDEPENDENT_PRACTICE]);
+        };
+
+        // Food: the trades in turn, until they make enough for everyone.
+        let foods: [Row, Recipe, number][] = [];
+        for (const [title, recipeName] of Object.entries(Schedules.FOOD_TRADES)) {
+            const recipe = Crafts.recipesOf(int(byTitle[title]?.id ?? 0)).filter((r) => r.name === recipeName)[0] ?? null;
+            const food = recipe ? Object.entries(recipe.out).filter(([good]) => edibles.includes(good)).reduce((sum, [, n]) => sum + n, 0) * Crafts.OUTPUT.Journeyman : 0;
+            if (food > 0) {
+                foods.push([byTitle[title], recipe!, food]);
+            }
+        }
+        const need = ids.length * Goods.FOOD_PER_DAY * Schedules.FOOD_MARGIN;
+        let made = 0;
+        const used = new Set<number>();
+        for (let turn = 0; foods.length && made < need && ids.length; turn++) {
+            const [occupation, recipe, food] = foods[turn % foods.length];
+            if (recipe.needs_acres !== null && !Schedules.giveFarmland(ids[0], float(recipe.needs_acres))) {
+                // No land to farm: the next food trade instead.
+                foods = foods.filter((f) => f[1].needs_acres === null);
+                continue;
+            }
+            give(ids.shift()!, occupation, recipe.id);
+            used.add(int(occupation.id));
+            made += food;
+        }
+        // Then one of each other occupation, and random ones (that need no land) for the rest.
+        const others = occupations.filter((o) => !used.has(int(o.id))
+            && !Crafts.recipesOf(int(o.id)).filter((r) => r.needs_acres !== null).length);
+        shuffle(others);
+        ids.forEach((id, i) => {
+            give(id, others[i] ?? others[array_rand(others)], null);
+        });
+        return ids.length + used.size;
+    }
+
+    /**
+     * Gives the anthro acres of the land office's land, if it holds less (its own lot, cut from the land office's
+     * largest lot in a village, or anywhere): a farmer's farmland. Returns whether it has the land now.
+     */
+    private static giveFarmland(anthroId: number, acres: number): boolean {
+        if (Land.totalAcres(anthroId) >= acres) {
+            return true;
+        }
+        const db = Auth.db();
+        const lot = db.row(
+            `SELECT p.* FROM game_parcels p LEFT JOIN game_barony_parts bp ON bp.id = p.part_id
+             WHERE p.anthro_id IS NULL AND p.acres >= ` + (acres * 2) + `
+               AND NOT EXISTS (SELECT 1 FROM game_land_listings l WHERE l.parcel_id = p.id AND l.status = 'open')
+             ORDER BY bp.kind = 'village' DESC, p.acres DESC LIMIT 1`,
+        );
+        if (!lot) {
+            return false;
+        }
+        db.run('UPDATE game_parcels SET acres = acres - ? WHERE id = ?', [acres, lot.id]);
+        db.run('INSERT INTO game_parcels (anthro_id, acres, barony_id, part_id) VALUES (?, ?, ?, ?)', [anthroId, acres, lot.barony_id, lot.part_id]);
+        return true;
+    }
+
+    /**
+     * The anthro's job, in words ("Brewer (Brewing: Journeyman)"): its trade, or the occupation of the skill it's
+     * practised most (see jobOf), with its level; null if it has none.
+     */
+    static jobLabel(anthro: Row): string | null {
+        const job = Schedules.jobOf(anthro);
+        if (!job) {
+            return null;
+        }
+        const practice = int(Auth.db().value('SELECT practice FROM game_anthro_skills WHERE anthro_id = ? AND skill_id = ?', [anthro.id, job.skill_id]));
+        return job.title + ' (' + job.skill + (practice ? ': ' + Schedules.level(practice) : ': untrained') + ')';
     }
 
     private static randomTrade(): Row | null {
@@ -331,17 +436,17 @@ export class Schedules {
      */
     static runDefaults(): number {
         const db = Auth.db();
-        const claim = db.run("INSERT OR IGNORE INTO game_daily (day, task) VALUES (UTC_DATE(), 'defaults')");
+        const claim = db.run('INSERT OR IGNORE INTO game_daily (day, task) VALUES (' + Clock.sqlToday() + ", 'defaults')");
         if (!claim) {
             return 0;
         }
-        const today = gmdate('Y-m-d');
+        const today = Clock.today();
         const ids = db.column(
             `SELECT a.id FROM game_anthros a
              WHERE a.owner_id IS NOT NULL AND a.died_at IS NULL AND a.employer_id IS NULL AND a.standard_schedule_id IS NULL
                AND NOT EXISTS (SELECT 1 FROM game_schedule_weekly w WHERE w.anthro_id = a.id)
-               AND NOT EXISTS (SELECT 1 FROM game_schedule_days d WHERE d.anthro_id = a.id AND d.day = UTC_DATE())
-               AND NOT EXISTS (SELECT 1 FROM game_schedule_log l WHERE l.anthro_id = a.id AND l.day = UTC_DATE())
+               AND NOT EXISTS (SELECT 1 FROM game_schedule_days d WHERE d.anthro_id = a.id AND d.day = ` + Clock.sqlToday() + `)
+               AND NOT EXISTS (SELECT 1 FROM game_schedule_log l WHERE l.anthro_id = a.id AND l.day = ` + Clock.sqlToday() + `)
                AND NOT EXISTS (SELECT 1 FROM game_auctions au WHERE au.anthro_id = a.id AND au.status = 'open')
              ORDER BY a.id`,
         );
@@ -531,7 +636,7 @@ export class Schedules {
      */
     static planned(anthroId: number): Record<string, Row> {
         const rows = Auth.db().all(
-            Schedules.PLAN_SELECT + ' FROM game_schedule_days p' + Schedules.PLAN_JOINS + ' WHERE p.anthro_id = ? AND p.day >= UTC_DATE() ORDER BY p.day',
+            Schedules.PLAN_SELECT + ' FROM game_schedule_days p' + Schedules.PLAN_JOINS + ' WHERE p.anthro_id = ? AND p.day >= ' + Clock.sqlToday() + ' ORDER BY p.day',
             [anthroId],
         );
         const days: Record<string, Row> = {};
@@ -555,7 +660,7 @@ export class Schedules {
     static upcoming(anthro: Row, days = 14, from: string | null = null): Record<string, Row> {
         const week = Schedules.weekly(anthro.id);
         const planned = Schedules.planned(anthro.id);
-        const start = int(strtotime((from ?? gmdate('Y-m-d')) + ' UTC'));
+        const start = Clock.parse(from ?? Clock.today());
         const plans: Record<string, Row> = {};
         for (let i = 0; i < days; i++) {
             const date = gmdate('Y-m-d', start + i * 86400);
@@ -762,8 +867,8 @@ export class Schedules {
         }
         // Upstream: DateTimeImmutable::createFromFormat('!Y-m-d', $date), and the date must read back the same.
         const parsed = /^\d{4}-\d{2}-\d{2}$/.test(date) ? strtotime(date + ' UTC') : false;
-        const last = gmdate('Y-m-d', strtotimeOrThrow('+' + Schedules.PLAN_AHEAD_DAYS + ' days'));
-        if (parsed === false || gmdate('Y-m-d', parsed) !== date || date < gmdate('Y-m-d') || date > last) {
+        const last = Clock.today(Schedules.PLAN_AHEAD_DAYS);
+        if (parsed === false || gmdate('Y-m-d', parsed) !== date || date < Clock.today() || date > last) {
             return 'Choose a day from today to ' + last + '.';
         }
         const [row, error] = Schedules.checked(Schedules.options(user, anthro), anthro.name, activity, detail);
@@ -812,10 +917,10 @@ export class Schedules {
     static runToday(): number {
         const db = Auth.db();
         // The day's work happens once, with the rest of the day's business: not for each anthro as its plans appear.
-        if (!db.run("INSERT OR IGNORE INTO game_daily (day, task) VALUES (UTC_DATE(), 'schedules')")) {
+        if (!db.run('INSERT OR IGNORE INTO game_daily (day, task) VALUES (' + Clock.sqlToday() + ", 'schedules')")) {
             return 0;
         }
-        const today = gmdate('Y-m-d');
+        const today = Clock.today();
         const ids = db.column(
             `SELECT anthro_id FROM game_schedule_weekly WHERE weekday = ?
              UNION SELECT a.id FROM game_anthros a JOIN game_standard_days d ON d.schedule_id = a.standard_schedule_id WHERE d.weekday = ?

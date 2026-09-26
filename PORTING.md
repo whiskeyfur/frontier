@@ -72,9 +72,16 @@ Start every ported file with a comment naming its upstream file, e.g. `// Upstre
 - Never `Date.now()`, `new Date()` or `Math.random()` in game code. Use `time()`, `gmdate(format, ts)`,
   `strtotime(text)` (`strtotimeOrThrow` when the input is known good), `today()`, `nowDateTime()`, `addDays(date, n)`
   from `src/core/php.ts`, and `random_int`, `array_rand`, `pick`, `shuffle`, `randomHex` (for
-  `bin2hex(random_bytes(n))`). They follow the game clock (`src/core/time.ts`) and the dice (`src/core/random.ts`),
+  `bin2hex(random_bytes(n))`). They follow the real clock (`src/core/time.ts`) and the dice (`src/core/random.ts`),
   which tests control (`setNow('2026-03-02 12:00:00')`, `setRandom(() => 0)`).
 - SQL's `UTC_DATE()`, `UTC_TIMESTAMP()` and `RAND()` use the same clock and dice.
+- The game has its own clock, apart from the real one (`Game\Clock`, `src/game/Clock.ts`): upstream writes
+  `Clock::today()`, `Clock::now()`, `Clock::sqlToday()` (a quoted literal spliced into SQL), `Clock::add(...)`... for
+  game dates, and PHP's `time()`/`gmdate()` and SQL's `UTC_TIMESTAMP()` for real ones (auctions, messages, the ledger).
+  Port each as upstream wrote it: `Clock.today()`, `' + Clock.sqlToday() + '` (mind the quotes: inside a template
+  string it's `` ` + Clock.sqlToday() + ` ``). Tests start the game's clock on the real today (`tests/TestCase.ts`,
+  as upstream's TestCase does); they move it by changing `game_settings` (see `tests/game/Clock.test.ts`), not with
+  `setNow`, which moves the real clock the game's is anchored to.
 
 ## The database
 
@@ -97,6 +104,9 @@ column order), the new tables as `schema.sql` now has them, and the seed rows up
 ported seeding code, e.g. `Crafts.seed(db)`, where upstream does). Before changing the schema, copy the current
 `schema.sql`, `seed.sql` and `triggers.sql` to `tests/db/v<version>/`, and extend `tests/db/Migrations.test.ts`: a game
 made by each earlier version must migrate to the same tables, columns, keys, indexes and rows as a new one.
+What upstream's migration sets up in a new database beyond its seed rows (the game clock's `game_settings`, which
+hold the moment it was made, so `tools/convert-schema.mjs` leaves them out of `seed.sql`) `createDatabase` does the
+same way (`toGameCalendar` in `src/db/migrations.ts`, upstream's `Schema::toGameCalendar`).
 
 **Keep upstream's SQL text** wherever SQLite accepts it; these MariaDB functions are registered so it does
 (`src/db/functions.ts`): `UTC_DATE()`, `UTC_TIMESTAMP()`, `NOW()`, `CURDATE()`, `RAND()`, `IF(c, a, b)`,
@@ -128,6 +138,8 @@ Rewrite these (and only these) when porting SQL:
 | `information_schema` queries                        | `src/db/meta.ts` (`COLUMNS`, `FOREIGN_KEYS`, `dateColumns`)   |
 | `SET FOREIGN_KEY_CHECKS = 0/1`                      | `PRAGMA foreign_keys = OFF/ON` (outside a transaction)        |
 | `LIMIT ?` bound as a string                         | bind a number                                                 |
+| `LIKE 'clock\_%'` (a backslash escape)              | `LIKE 'clock\_%' ESCAPE '\'` (SQLite's LIKE has no escape character unless given one) |
+| `SET @name = 'v'` (a user variable), `@name` in SQL | `db.setVariable('name', v)`, `VARIABLE('name')` (per connection: the router clears them each request) |
 | `'abc' = 'ABC'` between two literals/parameters     | binary in SQLite (only columns are NOCASE): add `COLLATE NOCASE` if it matters |
 | ORDER BY an ENUM column                             | MariaDB sorts ENUMs by their position in the list, not alphabetically: use a CASE |
 
@@ -159,7 +171,10 @@ It uses its own database, `frontier_phpunit`. **Never touch the databases `websi
 
 There's no server. `src/worker/` runs the game in a Web Worker: it keeps the SQLite database in memory, saves it to
 IndexedDB after each request that changes it, and answers the page's requests the way upstream's `game/index.php`
-does. `src/shell/` is the page: it turns links and forms into requests and shows the answers. There is one account,
+does. `src/shell/` is the page: it turns links and forms into requests and shows the answers. What upstream does
+per request happens per request here too (`src/site/router.ts` → `App`): the game's business for every game day that
+has passed (`Board.runDaily`, on the game's own clock) runs when the game is next used, as upstream's does; nothing
+runs while nobody is looking, there as here. There is one account,
 the person playing, who is both player and admin. Nothing in `src/game` should know about any of this.
 
 ## Pages: App's handlers and the views
@@ -210,13 +225,13 @@ what the handler passed to render (give it a type). See `src/core/html.ts` for t
   `market/time-left`, `market/where`, `subnav`, `message`.
 - `@php($x = ...)` → a `const` before the `return`, or inside the `.map()` callback for one in a loop.
 - `@push('admin') ... @endpush` → `${v.push('admin', html\`...\`)}` where it stood (it prints nothing there).
-  Likewise 'scripts' and 'styles'.
+  Likewise 'scripts' and 'styles'. `@once ... @endonce` → `${v.once('the/view') ? html\`...\` : ''}`.
 - `{{-- comments --}}` become JS comments (keep their text); HTML comments stay.
 - `@if(count($x))`, `@if($x)` on an array: PHP's empty array is false, JS's isn't: test `.length` (or `empty(x)`).
 - Numbers print as JS prints them: PHP prints `1.5` and `2` the same way, but a DECIMAL that PHP printed as `"2.50"`
   prints here as `2.5`. Where upstream prints a DECIMAL column directly, format it as upstream's output looked.
 - Keep the markup identical (classes, ids, names, text): tests and the page's scripts look for it.
 - Inline `<script>`s stay inline: the page shell runs them each time the page is shown, and removes the listeners
-  they added to `document`/`window` when the next page is shown. Scripts in the layout that fetched JSON are in
+  they added to `document`/`window`, and the intervals they started, when the next page is shown. Scripts in the layout that fetched JSON are in
   `src/shell/layout-scripts.ts`.
 - Links and form actions stay as upstream wrote them (`/game/...`): the shell turns them into `#/game/...`.

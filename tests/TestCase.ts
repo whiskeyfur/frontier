@@ -1,7 +1,7 @@
 /**
  * The test harness: upstream's Tests\TestCase and TestDatabase, as functions. Before each test (tests/setup.ts) the
  * game gets a fresh copy of a new database (seeded species, genders, names, ranks... and no users), an empty session,
- * the real clock and real randomness, and the day's 'defaults' task already claimed (test anthros would otherwise all
+ * the real clock and real randomness, the game's clock started today (see Clock.start), and the day's 'defaults' task already claimed (test anthros would otherwise all
  * work their trades each day: see Schedules::runDefaults; tests of that feature delete the claim).
  */
 import initSqlJs, { type SqlJsStatic } from 'sql.js';
@@ -14,6 +14,7 @@ import { gmdate, random_int, strtotimeOrThrow, ucfirst } from '../src/core/php';
 import { Db, type Params, type Row } from '../src/db/Db';
 import { createDatabase } from '../src/db/open';
 import { Anthros } from '../src/game/Anthros';
+import { Clock } from '../src/game/Clock';
 import { Wallets } from '../src/game/Wallets';
 
 let SQL: SqlJsStatic | null = null;
@@ -33,6 +34,9 @@ export async function freshDatabase(): Promise<Db> {
     Session.reset();
     setNow(null);
     setRandom(null);
+    // The game's clock starts today (real), so tests can speak of dates the way the game does; tests of the clock set
+    // their own.
+    Clock.start(gmdate('Y-m-d'));
     db.run("INSERT INTO game_daily (day, task) VALUES (UTC_DATE(), 'defaults')");
     return db;
 }

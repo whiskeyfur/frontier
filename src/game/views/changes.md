@@ -2,6 +2,32 @@ Newest first. Add new entries at the top, under a dated heading.
 
 ## 2026-09-26
 
+### A peopled world
+- **A new game starts with at least 100 commoners,** free and nobody's, each a Journeyman at a trade: first enough
+  farmers (given 10 acres each), fishers, hunters and swineherds to feed everyone, then **every other trade**.
+- **A new anthro can choose a skill**, and starts a Journeyman at it: it can work its trades at once.
+- **Choosing an anthro to become** shows each one's job and level.
+[[only: admin]]
+- **Reset game** sets at least how many commoners, villages, towns and cities the new game has (beside the court):
+  the court's own count, and the rest are added, spread over the baronies.
+[[/only]]
+
+### The game's own calendar
+- **The game's time runs apart from ours,** on its own calendar: this game moved to **1 January 1200** (everyone's age,
+  and every date, moved with it). A reset starts a new game on a date the admins choose.
+- **Choose the game's pace** under **Game → Preferences**: game days for each real day, from 0.25 to 24. The game runs
+  at the slowest pace anyone playing asks for (a game day a real day if nobody asks).
+- **Every game day happens,** however many pass between visits: meals, work, taxes and the rest, each in turn. (Before,
+  days nobody visited were skipped.)
+- **Auctions keep real time,** so there's always time to bid.
+- **A running clock** at the right of each section's bar shows the game's date and time, with buttons to ask for a
+  pace under it: the pace in effect pulses, yours is solid. The top of this page also says when the next game day
+  begins.
+[[only: admin]]
+- **Advance time** now moves the game's calendar on (dates in the game stay as they are), and **Reset game** asks for
+  the new game's first day.
+[[/only]]
+
 ### Work makes goods
 - **Occupations are producers, craftsmen or service jobs.** Producers make goods from their labour: a farmer grows
   grain, hops, flax or vegetables (on at least 10 acres of its master's land), a miner digs iron ore, stone, clay or
